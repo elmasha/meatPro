@@ -685,73 +685,59 @@
           </div>
 
           <v-row justify="center" align="stretch">
-            <v-col cols="12" md="5" lg="4" class="mb-4 mb-md-0 reveal-on-scroll">
-              <v-card class="pricing-card rounded-2xl pa-6 pa-sm-8 h-100" elevation="1">
-                <div class="text-overline grey--text mb-3 mb-sm-4 tracking-wide">STARTER</div>
-                <div class="d-flex align-baseline mb-4 mb-sm-6">
-                  <span class="text-h3 text-sm-h2 font-weight-black grey--text text--darken-3"
-                    >Free</span
-                  >
-                </div>
-                <v-divider class="mb-4 mb-sm-6" />
-                <v-list dense class="mb-6 mb-sm-8 transparent pa-0">
-                  <v-list-item
-                    v-for="item in starterFeatures"
-                    :key="item"
-                    class="px-0 mb-1 mb-sm-2"
-                  >
-                    <v-icon color="green" small class="mr-3">mdi-check-circle</v-icon>
-                    <span class="text-body-2 grey--text text--darken-1">{{ item }}</span>
-                  </v-list-item>
-                </v-list>
-                <v-btn
-                  block
-                  outlined
-                  color="red darken-2"
-                  depressed
-                  :large="!$vuetify.breakpoint.xs"
-                  :x-large="!$vuetify.breakpoint.xs && !$vuetify.breakpoint.sm"
-                  class="rounded-xl font-weight-bold text-capitalize"
-                  @click="navigateTo('/register')"
-                >
-                  Get Started
-                </v-btn>
-              </v-card>
-            </v-col>
-
-            <v-col cols="12" md="5" lg="4" class="reveal-on-scroll" style="transition-delay: 150ms">
-              <v-card class="pricing-card-pro rounded-2xl pa-6 pa-sm-8 h-100" dark elevation="8">
+            <v-col 
+              v-for="(plan, i) in plans" 
+              :key="plan.id"
+              cols="12" md="5" lg="4" 
+              class="mb-4 mb-md-0 reveal-on-scroll"
+              :style="{ transitionDelay: (i * 150) + 'ms' }"
+            >
+              <v-card 
+                :class="parseFloat(plan.price) > 0 ? 'pricing-card-pro' : 'pricing-card'" 
+                class="rounded-2xl pa-6 pa-sm-8 h-100" 
+                :dark="parseFloat(plan.price) > 0"
+                elevation="1"
+              >
                 <div class="d-flex align-center justify-space-between mb-3 mb-sm-4">
-                  <span class="text-overline red--text text--lighten-3 tracking-wide"
-                    >PROFESSIONAL</span
-                  >
-                  <v-chip color="white" x-small label class="red--text font-weight-bold"
+                  <span 
+                    class="text-overline tracking-wide"
+                    :class="parseFloat(plan.price) > 0 ? 'red--text text--lighten-3' : 'grey--text'"
+                  >{{ (plan.plan_name || 'PLAN').toUpperCase() }}</span>
+                  <v-chip v-if="parseFloat(plan.price) > 0" color="white" x-small label class="red--text font-weight-bold"
                     >Best Value</v-chip
                   >
                 </div>
                 <div class="d-flex align-baseline mb-4 mb-sm-6">
-                  <span class="text-h3 text-sm-h2 font-weight-black">KES 1,500</span>
-                  <span class="text-body-2 text-sm-subtitle-1 red--text text--lighten-3 ml-2"
+                  <span class="text-h3 text-sm-h2 font-weight-black" :class="parseFloat(plan.price) === 0 ? 'grey--text text--darken-3' : ''">
+                    {{ parseFloat(plan.price) === 0 ? 'Free' : 'KES ' + formatNumber(plan.price) }}
+                  </span>
+                  <span v-if="parseFloat(plan.price) > 0" class="text-body-2 text-sm-subtitle-1 ml-2" :class="parseFloat(plan.price) > 0 ? 'red--text text--lighten-3' : ''"
                     >/mo</span
                   >
                 </div>
-                <v-divider class="mb-4 mb-sm-6 red darken-2" />
-                <v-list dense dark class="mb-6 mb-sm-8 transparent pa-0">
-                  <v-list-item v-for="item in proFeatures" :key="item" class="px-0 mb-1 mb-sm-2">
-                    <v-icon color="green lighten-2" small class="mr-3">mdi-check-circle</v-icon>
-                    <span class="text-body-2 red--text text--lighten-4">{{ item }}</span>
+                <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price) > 0 ? 'red darken-2' : ''" />
+                <v-list dense :dark="parseFloat(plan.price) > 0" class="mb-6 mb-sm-8 transparent pa-0">
+                  <v-list-item
+                    v-for="feature in parseFeatures(plan.features)"
+                    :key="feature"
+                    class="px-0 mb-1 mb-sm-2"
+                  >
+                    <v-icon :color="parseFloat(plan.price) > 0 ? 'green lighten-2' : 'green'" small class="mr-3">mdi-check-circle</v-icon>
+                    <span class="text-body-2" :class="parseFloat(plan.price) > 0 ? 'red--text text--lighten-4' : 'grey--text text--darken-1'">{{ feature }}</span>
                   </v-list-item>
                 </v-list>
                 <v-btn
                   block
-                  color="white"
+                  :outlined="parseFloat(plan.price) === 0"
+                  :color="parseFloat(plan.price) === 0 ? 'red darken-2' : 'white'"
                   depressed
                   :large="!$vuetify.breakpoint.xs"
                   :x-large="!$vuetify.breakpoint.xs && !$vuetify.breakpoint.sm"
-                  class="red--text rounded-xl font-weight-bold text-capitalize hover-lift"
-                  @click="navigateTo('/register?plan=pro')"
+                  class="rounded-xl font-weight-bold text-capitalize"
+                  :class="parseFloat(plan.price) > 0 ? 'red--text hover-lift' : ''"
+                  @click="navigateTo(parseFloat(plan.price) === 0 ? '/register' : '/register?plan=' + (plan.plan_name || 'pro').toLowerCase())"
                 >
-                  Start 14-Day Trial
+                  {{ parseFloat(plan.price) === 0 ? 'Get Started' : 'Start 14-Day Trial' }}
                 </v-btn>
               </v-card>
             </v-col>
@@ -882,6 +868,10 @@
 </template>
 
 <script>
+import apiClient from '../services/api'
+import moment from 'moment'
+import numeral from 'numeral'
+
 export default {
   name: 'ModernHome',
   layout: 'public',
@@ -897,6 +887,7 @@ export default {
       userEmail: '',
       animatedStats: [0, 0, 0, 0],
       statsAnimated: false,
+      plans: [],
 
       navLinks: [
         { label: 'Features', to: null, section: 'features', action: () => this.scrollToSection('features') },
@@ -1008,24 +999,6 @@ export default {
         },
       ],
 
-      starterFeatures: [
-        '1 shop / branch',
-        'Daily closing entries',
-        'Basic profit summary',
-        '7-day history',
-        'Email support',
-      ],
-
-      proFeatures: [
-        'Unlimited branches',
-        'Advanced analytics & reports',
-        'Waste trend forecasting',
-        'Unlimited history + CSV export',
-        'Priority WhatsApp support',
-        'Multi-user team access',
-        'Custom price alerts',
-      ],
-
       footerLinks: [
         {
           title: 'Product',
@@ -1059,6 +1032,7 @@ export default {
     window.addEventListener('scroll', this.handleScroll)
     this.initIntersectionObserver()
     this.checkAuth()
+    this.fetchPlans()
   },
 
   beforeDestroy() {
@@ -1067,6 +1041,24 @@ export default {
   },
 
   methods: {
+    formatNumber(val) {
+      return numeral(val || 0).format('0,0')
+    },
+    parseFeatures(featuresJson) {
+      try {
+        return JSON.parse(featuresJson || '[]')
+      } catch {
+        return []
+      }
+    },
+    async fetchPlans() {
+      try {
+        const { data } = await apiClient.get('/plans')
+        this.plans = Object.freeze(data || [])
+      } catch (e) {
+        console.error('Plans load error', e)
+      }
+    },
     handleScroll() {
       this.scrolled = window.scrollY > 50
     },
