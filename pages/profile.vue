@@ -596,6 +596,7 @@ export default {
       ],
 
       snackbar: { show: false, text: '', color: 'success' },
+      authUnsubscribe: null,
     }
   },
 
@@ -668,8 +669,8 @@ export default {
           'get',
           `/branches/my?firebase_uid=${this.user.uid}`
         )
-        this.branches = data
-        this.branch = data[0]
+        this.branches = Object.freeze(data || [])
+        this.branch = data[0] || this.branch
         console.log('Profile data', this.branches)
 
         if (data.branch) {
@@ -738,7 +739,7 @@ export default {
   mounted() {
     this.onResize()
     window.addEventListener('resize', this.onResize)
-    this.$fire.auth.onAuthStateChanged((user) => {
+    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
       if (user) {
         this.user = user
         this.loadProfile()
@@ -750,6 +751,9 @@ export default {
 
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
+    if (this.authUnsubscribe) {
+      this.authUnsubscribe()
+    }
   },
 }
 </script>
@@ -828,11 +832,24 @@ export default {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: rgba(245, 245, 245, 0.85);
+  background: rgba(245, 245, 245, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
+  /* Prevent ghosting/black bars during scroll */
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+@media (max-width: 599px) {
+  .sticky-header {
+    /* Backdrop filter is extremely expensive on mobile GPUs and causes scroll lag/black screens */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #f5f5f5 !important;
+    border-bottom: 1px solid #eeeeee;
+  }
 }
 
 .sticky-header.scrolled {

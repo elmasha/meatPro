@@ -225,6 +225,7 @@ export default {
       successResponse: "",
       errorResponse: "",
       CheckoutRequestID: null,
+      authUnsubscribe: null,
       CheckoutResponseID: null,
       CheckoutRequestDate: null,
       CheckoutResponseDate: null,
@@ -242,8 +243,8 @@ export default {
       let that = this;
       that.snackbar_s = true;
       that.snackbarText_s = "Checking payment status...";
-      axios
-        .post("http://localhost:5055/payments/stk/query", {
+      apiClient
+        .post("/payments/stk/query", {
           checkoutRequestId: that.CheckoutRequestID,
         })
         .then(function (response) {
@@ -320,8 +321,8 @@ export default {
       this.to = this.$fire.auth.currentUser.uid;
       this.status = "unseen";
       this.uid = this.$fire.auth.currentUser.uid;
-      axios
-        .put("http://localhost:5055/notification/addNotification", {
+      apiClient
+        .put("/notification/addNotification", {
           title: this.title,
           body: this.body,
           from_user: this.from,
@@ -333,16 +334,9 @@ export default {
         })
         .then(function (response) {
           console.log(response);
-          if (response.status == 200) {
-          } else if (response.status == 400) {
-            // this.snackbarError = true;
-            // this.snackbarTextError = response.data;
-          }
         })
         .catch(function (error) {
           console.log(error);
-          // this.snackbarTextError = error;
-          // this.snackbarError = true;
         });
     },
     onResize() {
@@ -350,7 +344,6 @@ export default {
         x: window.innerWidth,
         y: window.innerHeight,
       };
-      console.log("size", this.windowSize.x);
       if (this.windowSize.x < 950) {
         this.showSide = true;
       } else {
@@ -360,20 +353,19 @@ export default {
     },
     FetchUser() {
       let that = this;
-      axios
-        .get(`http://localhost:5055/user/getUser/${that.$fire.auth.currentUser.uid}`, {})
+      apiClient
+        .get(`/user/getUser/${that.user.uid}`, {})
         .then(function (response) {
           console.log("Payment page", response.data[0]);
           if (response.status == 200) {
-            // that.snackbar = true;
-            // that.snackbarText = response.data;
-            that.UserName = response.data[0].shopName;
-            that.UserType = response.data[0].userCategory;
-            that.UserName = response.data[0].username;
-            that.paymentDate = response.data[0].payment_date;
-            that.subscriptionType = response.data[0].subscriptionType;
-            that.subscriptionAmount = response.data[0].subscriptionAmount;
-            that.mpesaReceipt = response.data[0].mpesaReceipt;
+            const userData = response.data[0];
+            that.UserName = userData.shopName;
+            that.UserType = userData.userCategory;
+            that.UserName = userData.username;
+            that.paymentDate = userData.payment_date;
+            that.subscriptionType = userData.subscriptionType;
+            that.subscriptionAmount = userData.subscriptionAmount;
+            that.mpesaReceipt = userData.mpesaReceipt;
 
             if (that.UserType == "retailer") {
               that.amountMonth = that.retailer.month;
@@ -383,24 +375,14 @@ export default {
               that.amountYear = that.supplier.year;
             }
 
-            if (response.data[0].mpesaReceipt == null) {
+            if (userData.mpesaReceipt == null) {
               that.snackbarError = true;
               that.snackbarTextError = "Please pay for subscription";
-              that.payment_status = "Please pay for subscription";
-              that.payment_state = true;
-            } else {
-              that.payment_status = "";
-              that.payment_state = false;
             }
-          } else if (response.status == 400) {
-            that.snackbarError = true;
-            that.snackbarTextError = response.data;
           }
         })
         .catch(function (error) {
-          console.log(error);
-          that.snackbarTextError = error;
-          that.snackbarError = true;
+          console.error(error);
         });
     },
     StkPush() {
@@ -412,40 +394,54 @@ export default {
         that.snackbarTextError = "Provide amount.";
         that.snackbarError = true;
       } else {
-        axios
-          .post("http://localhost:5055/payments/stk", {
+        apiClient
+          .post("/payments/stk", {
             phone: that.phone,
             amount: that.amount,
-            user_id: that.$fire.auth.currentUser.uid,
+            user_id: that.user.uid,
             User_name: that.UserName,
             subscription: that.duration,
             User_type: that.UserType,
           })
           .then(function (response) {
-            console.log(response);
             if (response.status == 200) {
               that.snackbar = true;
               that.progress_bar = true;
               that.snackbarText = response.data;
               that.CheckoutRequestID = response.data.CheckoutRequestID;
               that.timerEnabled = true;
-            } else if (response.status == 400) {
-              that.snackbarError = true;
-              that.snackbarTextError = response.data;
             }
           })
           .catch(function (error) {
-            console.log(error);
+            console.error(error);
             that.snackbarTextError = error;
             that.snackbarError = true;
             that.progress_bar = false;
           });
       }
-      Error;
+    },
+    logout() {
+      this.$fire.auth.signOut();
+      this.$router.push("/login");
     },
   },
-  created() {
-    this.FetchUser();
+  mounted() {
+    this.onResize();
+    window.addEventListener("resize", this.onResize);
+    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
+      if (user) {
+        this.user = user;
+        this.FetchUser();
+      } else {
+        this.$router.push("/login");
+      }
+    });
+  },
+  beforeDestroy() {
+    window.removeEventListener("resize", this.onResize);
+    if (this.authUnsubscribe) {
+      this.authUnsubscribe();
+    }
   },
   watch: {
     timerEnabled(value) {

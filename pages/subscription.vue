@@ -318,7 +318,8 @@ export default {
         { text: 'Status', value: 'status', align: 'center' }
       ],
       
-      snackbar: { show: false, text: '', color: 'success' }
+      snackbar: { show: false, text: '', color: 'success' },
+      authUnsubscribe: null
     }
   },
   

@@ -203,7 +203,8 @@ export default {
       business: { name: '', owner_name: '', phone: '' },
       branch: { name: '', location: '' },
       createdBusinessId: null,
-      snackbar: { show: false, text: '', color: 'success' }
+      snackbar: { show: false, text: '', color: 'success' },
+      authUnsubscribe: null
     }
   },
 
@@ -261,7 +262,7 @@ export default {
   },
 
   mounted() {
-    this.$fire.auth.onAuthStateChanged(user => {
+    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged(user => {
       if (!user) {
         this.$router.push('/login')
       } else {
@@ -273,6 +274,12 @@ export default {
           .catch(() => {})
       }
     })
+  },
+
+  beforeDestroy() {
+    if (this.authUnsubscribe) {
+      this.authUnsubscribe()
+    }
   }
 }
 </script>
