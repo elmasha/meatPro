@@ -877,7 +877,8 @@ export default {
       extendDays: 7,
 
       // Snackbar
-      snackbar: { show: false, text: '', color: 'success' }
+      snackbar: { show: false, text: '', color: 'success' },
+      authUnsubscribe: null
     }
   },
   computed: {
@@ -1012,10 +1013,21 @@ export default {
   mounted() {
     this.onResize()
     window.addEventListener('resize', this.onResize)
-    this.refreshAll()
+    
+    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
+      if (user) {
+        this.userName = user.displayName || 'Admin'
+        this.refreshAll()
+      } else {
+        this.$router.push('/login')
+      }
+    })
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
+    if (this.authUnsubscribe) {
+      this.authUnsubscribe()
+    }
   },
   methods: {
     getUid() {
@@ -1060,21 +1072,21 @@ export default {
     async fetchUsers() {
       try {
         const { data } = await api.get('/admin/users')
-        this.users = data.data
-        this.recentUsers = data.data.slice(0, 5)
+        this.users = Object.freeze(data.data)
+        this.recentUsers = Object.freeze(data.data.slice(0, 5))
       } catch (err) { console.error(err) }
     },
     async fetchPayments() {
       try {
         const { data } = await api.get('/admin/payments')
-        this.payments = data.data
-        this.pendingPayments = data.data.filter(p => !p.mpesa_receipt).slice(0, 5)
+        this.payments = Object.freeze(data.data)
+        this.pendingPayments = Object.freeze(data.data.filter(p => !p.mpesa_receipt).slice(0, 5))
       } catch (err) { console.error(err) }
     },
     async fetchPlans() {
       try {
         const { data } = await api.get('/admin/plans')
-        this.plans = data.data
+        this.plans = Object.freeze(data.data)
       } catch (err) { console.error(err) }
     },
     async fetchSubscriptions() {
@@ -1082,13 +1094,13 @@ export default {
         const params = { ...this.subFilter }
         if (params.status === 'all') delete params.status
         const { data } = await api.get('/admin/subscriptions', { params })
-        this.subscriptions = data.data
+        this.subscriptions = Object.freeze(data.data)
       } catch (err) { console.error(err) }
     },
     async fetchRevenue() {
       try {
         const { data } = await api.get('/admin/revenue', { params: this.financeFilters })
-        this.revenueData = data.data.timeline
+        this.revenueData = Object.freeze(data.data.timeline)
         this.revenueSummary = data.data.summary
       } catch (err) { console.error(err) }
     },
@@ -1279,8 +1291,8 @@ export default {
       this.snackbar = { show: true, text, color }
     },
     logout() {
-      fire.auth.signOut()
-      router.push('/login')
+      this.$fire.auth.signOut()
+      this.$router.push('/login')
     }
   }
 }

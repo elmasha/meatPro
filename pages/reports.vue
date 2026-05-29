@@ -1068,6 +1068,7 @@ export default {
         text: '',
         color: 'success',
       },
+      authUnsubscribe: null,
 
       menuItems: [
         {
@@ -1180,56 +1181,58 @@ export default {
         })
         return response.data
       } catch (error) {
-        const msg = error.response.data.message || error.message
+        const msg = error.response?.data?.message || error.message
         this.showSnackbar(msg, 'error')
         throw error
       }
     },
 
     async refreshAll() {
+      if (this.loading) return
       this.loading = true
-      await Promise.all([
-        this.loadComparative(),
-        this.loadProfitability(),
-        this.loadWaste(),
-        this.loadPayment(),
-        this.loadExpenses(),
-        this.loadSummary(),
-      ])
-      this.loading = false
+      try {
+        await Promise.all([
+          this.loadComparative(),
+          this.loadProfitabilityAndSummary(),
+          this.loadWaste(),
+          this.loadPayment(),
+          this.loadExpenses()
+        ])
+      } finally {
+        this.loading = false
+      }
     },
 
     async loadComparative() {
       try {
-        this.comparative = await this.apiCall(
+        const data = await this.apiCall(
           'get',
           `/reports/comparative?branch_id=${this.branchId}`
         )
+        this.comparative = Object.freeze(data)
       } catch (e) {
         console.error('Comparative error', e)
       }
     },
 
-    async loadProfitability() {
+    async loadProfitabilityAndSummary() {
       try {
         const data = await this.apiCall(
           'get',
           `/reports/profitability?branch_id=${this.branchId}&days=${this.periodDays}`
         )
-        this.dayOfWeek = data.dayOfWeek || []
-        if (this.dayOfWeek == null) {
-          this.refreshAll()
-        }
+        this.dayOfWeek = Object.freeze(data.dayOfWeek || [])
+        
         const maxProfit = Math.max(
           ...data.daily.map((d) => Math.abs(parseFloat(d.profit) || 0)),
           1
         )
-        this.profitTrend = data.daily.map((d) => ({
+        this.profitTrend = Object.freeze(data.daily.map((d) => ({
           date: d.date,
           profit: parseFloat(d.profit) || 0,
           revenue: parseFloat(d.revenue) || 0,
           pct: ((Math.abs(parseFloat(d.profit) || 0) / maxProfit) * 80 + 5),
-        }))
+        })))
 
         const totalMargin = data.daily.reduce(
           (s, d) => s + (parseFloat(d.margin_pct) || 0),
@@ -1238,6 +1241,13 @@ export default {
         this.avgMargin = data.daily.length
           ? (totalMargin / data.daily.length).toFixed(1)
           : 0
+
+        this.dailySummary = Object.freeze(data.daily.slice().reverse().map((d) => ({
+          ...d,
+          waste_pct: d.revenue
+            ? (parseFloat(d.waste_kg || 0) / parseFloat(d.sold_kg || 1)) * 100
+            : 0,
+        })))
       } catch (e) {
         console.error('Profitability error', e)
       }
@@ -1245,10 +1255,14 @@ export default {
 
     async loadWaste() {
       try {
-        this.wasteData = await this.apiCall(
+        const data = await this.apiCall(
           'get',
           `/reports/waste-analysis?branch_id=${this.branchId}&days=${this.periodDays}`
         )
+        this.wasteData = {
+          ...data,
+          data: Object.freeze(data.data)
+        }
       } catch (e) {
         console.error('Waste error', e)
       }
@@ -1256,10 +1270,14 @@ export default {
 
     async loadPayment() {
       try {
-        this.paymentData = await this.apiCall(
+        const data = await this.apiCall(
           'get',
           `/reports/payment-mix?branch_id=${this.branchId}&days=${this.periodDays}`
         )
+        this.paymentData = {
+          ...data,
+          data: Object.freeze(data.data)
+        }
       } catch (e) {
         console.error('Payment error', e)
       }
@@ -1267,29 +1285,16 @@ export default {
 
     async loadExpenses() {
       try {
-        this.expenseData = await this.apiCall(
+        const data = await this.apiCall(
           'get',
           `/reports/expense-breakdown?branch_id=${this.branchId}&days=${this.periodDays}`
         )
+        this.expenseData = {
+          ...data,
+          data: Object.freeze(data.data)
+        }
       } catch (e) {
         console.error('Expense error', e)
-      }
-    },
-
-    async loadSummary() {
-      try {
-        const data = await this.apiCall(
-          'get',
-          `/reports/profitability?branch_id=${this.branchId}&days=${this.periodDays}`
-        )
-        this.dailySummary = data.daily.reverse().map((d) => ({
-          ...d,
-          waste_pct: d.revenue
-            ? (parseFloat(d.waste_kg || 0) / parseFloat(d.sold_kg || 1)) * 100
-            : 0,
-        }))
-      } catch (e) {
-        console.error('Summary error', e)
       }
     },
 
@@ -1334,15 +1339,13 @@ export default {
     },
     async loadUserProfile() {
       try {
-        if (!this.user.uid) return
+        if (!this.user?.uid) return
         const { data } = await apiClient.get(`/users/${this.user.uid}/profile`)
         this.userProfile = data
-        console.log(data)
-        if (data.firebase_uid != null) {
+        if (data.id) {
+          this.branchId = data.id
           this.refreshAll()
         }
-
-        if (data.id) this.branchId = data.id
       } catch (e) {
         console.error('Profile load error:', e)
       }
@@ -1353,23 +1356,21 @@ export default {
     this.onResize()
     window.addEventListener('resize', this.onResize)
 
-    this.$fire.auth.onAuthStateChanged((user) => {
+    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
       if (user) {
         this.user = user
         this.loadUserProfile()
-        this.refreshAll()
       } else {
         this.$router.push('/login')
       }
     })
   },
 
-  created() {
-    this.refreshAll()
-  },
-
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
+    if (this.authUnsubscribe) {
+      this.authUnsubscribe()
+    }
   },
 }
 </script>

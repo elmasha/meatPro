@@ -1379,6 +1379,7 @@ export default {
         text: '',
         color: 'success',
       },
+      authUnsubscribe: null,
 
       menuItems: [
         {
@@ -1867,11 +1868,11 @@ export default {
   mounted() {
     this.onResize()
     window.addEventListener('resize', this.onResize)
-    this.$fire.auth.onAuthStateChanged((user) => {
+    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
       if (user) {
         this.user = user
         this.refreshAll()
-        this.loadUserProfile() // <-- ADD THIS LINE
+        this.loadUserProfile()
       } else {
         this.$router.push('/login')
       }
@@ -1880,6 +1881,9 @@ export default {
 
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
+    if (this.authUnsubscribe) {
+      this.authUnsubscribe()
+    }
   },
 }
 </script>
