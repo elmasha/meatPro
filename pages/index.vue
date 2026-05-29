@@ -1054,7 +1054,7 @@ export default {
     async fetchPlans() {
       try {
         const { data } = await apiClient.get('/plans')
-        this.plans = Object.freeze(data || [])
+        this.plans = data;
       } catch (e) {
         console.error('Plans load error', e)
       }
