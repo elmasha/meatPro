@@ -241,10 +241,11 @@
                           class="chart-bar-modern"
                           :style="{
                             height: `${Math.max(day.pct, 5)}%`,
-                            backgroundColor:
+                            backgroundImage:
                               day.profit >= 0
                                 ? 'linear-gradient(to top, #4caf50, #81c784)'
                                 : 'linear-gradient(to top, #f44336, #e57373)',
+                            backgroundColor: day.profit >= 0 ? '#4caf50' : '#f44336'
                           }"
                         ></div>
                       </div>
