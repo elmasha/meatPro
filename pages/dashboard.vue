@@ -1622,14 +1622,22 @@ export default {
     },
 
     async refreshAll() {
+      if (this.loading) return
       this.loading = true
-      await Promise.all([
-        this.loadUserProfile(),
-        this.loadStats(),
-        this.loadRecentEntries(),
-        this.loadLastEntry(),
-      ])
-      this.loading = false
+      try {
+        await this.loadUserProfile()
+        if (this.branchId) {
+          await Promise.all([
+            this.loadStats(),
+            this.loadRecentEntries(),
+            this.loadLastEntry(),
+          ])
+        }
+      } catch (e) {
+        console.error('Refresh error', e)
+      } finally {
+        this.loading = false
+      }
     },
 
     async loadStats() {
@@ -1666,7 +1674,7 @@ export default {
           'get',
           `/daily-operations?branch_id=${this.branchId}`
         )
-        this.recentEntries = entries || []
+        this.recentEntries = Object.freeze(entries || [])
         console.log('Recent entries', this.recentEntries)
         const todayEntry = this.recentEntries.find((e) => e.date === this.searchDate2)
         if (todayEntry) {
@@ -1685,9 +1693,6 @@ export default {
           `/daily-operations/last?branch_id=${this.branchId}`
         )
         console.log('Last entry', entry)
-        if (entry == null) {
-          this.refreshAll()
-        }
         if (entry) {
           this.lastClosingStock = entry.closing_stock_kg
           if (!this.form.opening_stock_kg && this.isToday && !this.isEditing) {
