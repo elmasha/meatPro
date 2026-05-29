@@ -1972,11 +1972,24 @@ export default {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: rgba(245, 245, 245, 0.85);
+  background: rgba(245, 245, 245, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
+  /* Prevent ghosting/black bars during scroll */
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+@media (max-width: 599px) {
+  .sticky-header {
+    /* Backdrop filter is extremely expensive on mobile GPUs and causes scroll lag/black screens */
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #f5f5f5 !important;
+    border-bottom: 1px solid #eeeeee;
+  }
 }
 
 .sticky-header.scrolled {
