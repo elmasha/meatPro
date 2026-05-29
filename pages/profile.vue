@@ -9,7 +9,7 @@
       color="white"
     >
       <div class="pa-6 pb-4">
-        <div class="d-flex align-center">
+        <div class="d-flex align-center cursor-pointer" @click="$router.push('/')">
           <div class="logo-container mr-3">
             <v-avatar color="red darken-2" size="44">
               <v-icon color="white" size="22">mdi-food-steak</v-icon>
@@ -760,6 +760,10 @@ export default {
 
 <style scoped>
 /* Base Utilities */
+.cursor-pointer {
+  cursor: pointer;
+}
+
 .bg-grey-lighten-4 {
   background-color: #f5f5f5 !important;
 }

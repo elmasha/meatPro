@@ -10,7 +10,7 @@
       height="70"
       elevate-on-scroll
     >
-      <div class="d-flex align-center">
+      <div class="d-flex align-center cursor-pointer" @click="scrollToSection('hero')">
         <div class="logo-pulse mr-3">
           <v-avatar color="red darken-2" size="38">
             <v-icon color="white" size="20">mdi-food-steak</v-icon>

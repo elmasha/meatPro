@@ -9,7 +9,7 @@
       color="white"
     >
       <div class="pa-6 pb-4">
-        <div class="d-flex align-center">
+        <div class="d-flex align-center cursor-pointer" @click="$router.push('/')">
           <div class="logo-container mr-3">
             <v-avatar color="red darken-2" size="44">
               <v-icon color="white" size="22">mdi-shield-account</v-icon>
@@ -1300,6 +1300,7 @@ export default {
 
 <style scoped>
 /* ===== EXACT COPY OF YOUR DASHBOARD STYLES ===== */
+.cursor-pointer { cursor: pointer; }
 .bg-grey-lighten-4 { background-color: #f5f5f5 !important; }
 .rounded-xl { border-radius: 16px !important; }
 .h-100 { height: 100%; }

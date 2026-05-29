@@ -3,7 +3,7 @@
     <!-- Desktop Sidebar -->
     <v-navigation-drawer v-if="!nav_bars" permanent width="260" class="elevation-1" color="white">
       <div class="pa-6">
-        <div class="d-flex align-center mb-1">
+        <div class="d-flex align-center mb-1 cursor-pointer" @click="$router.push('/')">
           <v-avatar color="red darken-2" size="36" class="mr-3">
             <v-icon color="white" size="20">mdi-food-steak</v-icon>
           </v-avatar>
@@ -465,6 +465,7 @@ export default {
 </script>
 
 <style scoped>
+.cursor-pointer { cursor: pointer; }
 .bg-grey-lighten-4 { background-color: #f5f5f5 !important; }
 .rounded-2xl { border-radius: 20px !important; }
 .rounded-xl { border-radius: 16px !important; }
