@@ -1379,7 +1379,9 @@ export default {
         text: '',
         color: 'success',
       },
+
       authUnsubscribe: null,
+      mpesaReceipt:null,
 
       menuItems: [
         {
@@ -1589,6 +1591,12 @@ export default {
   },
 
   methods: {
+    checkPaymentInfo() {
+      if (!this.mpesaReceipt) {
+        this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
+        this.$router.push('/subscription')
+      }
+    },
     formatNumber(val) {
       return numeral(val || 0).format('0,0')
     },
@@ -1628,6 +1636,7 @@ export default {
         await this.loadUserProfile()
         if (this.branchId) {
           await Promise.all([
+            this.checkPaymentInfo(),
             this.loadStats(),
             this.loadRecentEntries(),
             this.loadLastEntry(),
@@ -1720,6 +1729,7 @@ export default {
         console.log(data)
         // Auto-set shop name and branch from profile if available
         if (data.business_name) this.shopName = data.business_name
+        if (data.mpesa_receipt) this.mpesaReceipt = data.mpesa_receipt
         if (data.id) this.branchId = data.id
       } catch (e) {
         console.error('Profile load error:', e)

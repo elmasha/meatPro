@@ -953,6 +953,7 @@ export default {
 
   data() {
     return {
+      mpesaReceipt: null,
       userProfile: null,
       nav_bars: false,
       mobileDrawer: false,
@@ -1137,6 +1138,12 @@ export default {
   },
 
   methods: {
+  checkPaymentInfo(val) {
+        if (val== null) {
+          this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
+          this.$router.push('/subscription')
+        }
+      },
     formatNumber(val) {
       return numeral(val || 0).format('0,0')
     },
@@ -1345,6 +1352,8 @@ export default {
         this.userProfile = data
         if (data.id) {
           this.branchId = data.id
+          this.mpesaReceipt = data.mpesa_receipt
+          this.checkPaymentInfo(this.mpesaReceipt);
           this.refreshAll()
         }
       } catch (e) {
