@@ -1593,8 +1593,8 @@ export default {
   methods: {
     checkPaymentInfo() {
       if (!this.mpesaReceipt) {
-        this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
-        this.$router.push('/subscription')
+        // this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
+        // this.$router.push('/subscription')
       }
     },
     formatNumber(val) {
