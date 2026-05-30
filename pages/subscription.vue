@@ -106,16 +106,17 @@
                 {{ plan.description }}
               </p>
 
-              <v-divider class="mb-4" :class="plan.name === 'pro' ? 'red darken-2' : 'grey lighten-2'" />
-
-              <v-list dense class="pa-0 mb-6 flex-grow-1" :dark="plan.name === 'pro'">
-                <v-list-item v-for="feature in parseFeatures(plan.features)" :key="feature" class="px-0 mb-2">
-                  <v-icon :color="plan.name === 'pro' ? 'green lighten-2' : 'green'" small class="mr-3">mdi-check-circle</v-icon>
-                  <span class="text-body-2" :class="plan.name === 'pro' ? 'red--text text--lighten-4' : 'grey--text text--darken-1'">
-                    {{ feature }}
-                  </span>
-                </v-list-item>
-              </v-list>
+              <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price_kes) > 10 ? 'red darken-2' : ''" />
+                <v-list dense :dark="parseFloat(plan.price_kes) > 10" class="mb-6 mb-sm-8 transparent pa-0">
+                  <v-list-item
+                    v-for="feature in parseFeatures(plan.features)"
+                    :key="feature"
+                    class="px-0 mb-1 mb-sm-2"
+                  >
+                    <v-icon :color="parseFloat(plan.price_kes) > 10 ? 'green lighten-2' : 'green'" small class="mr-3">mdi-check-circle</v-icon>
+                    <span class="text-body-2" :class="parseFloat(plan.price_kes) > 10 ? 'red--text text--lighten-4' : 'grey--text text--darken-1'">{{ feature }}</span>
+                  </v-list-item>
+                </v-list>
 
               <v-btn
                 v-if="plan.price_kes > 0"
@@ -128,7 +129,7 @@
                 :disabled="isCurrentPlan(plan.name) && currentSub?.is_active"
               >
                 <v-icon left>{{ isCurrentPlan(plan.name) ? 'mdi-refresh' : 'mdi-crown-outline' }}</v-icon>
-                {{ isCurrentPlan(plan.name) ? 'Renew Plan' : 'Upgrade to Pro' }}
+                {{ isCurrentPlan(plan.name) ? 'Renew Plan' : `Upgrade to ${plan.display_name}` }}
               </v-btn>
               
               <v-btn v-else block large outlined color="grey" class="rounded-xl text-capitalize" disabled>
@@ -353,6 +354,7 @@ export default {
       try {
         const { data } = await apiClient.get('/plans');
         this.plans = data;
+        console.log('Loaded plans:', data);
       } catch (e) { console.error('Plans error', e); }
     },
     
