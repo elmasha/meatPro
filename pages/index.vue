@@ -693,9 +693,9 @@
               :style="{ transitionDelay: (i * 150) + 'ms' }"
             >
               <v-card 
-                :class="parseFloat(plan.price_kes) > 10 ? 'pricing-card-pro' : 'pricing-card'" 
+                :class="parseFloat(plan.price_kes) > 500 ? 'pricing-card-pro' : 'pricing-card'" 
                 class="rounded-2xl pa-6 pa-sm-8 h-100" 
-                :dark="parseFloat(plan.price_kes) > 10"
+                :dark="parseFloat(plan.price_kes) > 500"
                 elevation="1"
               >
                 <div class="d-flex align-center justify-space-between mb-3 mb-sm-4">
@@ -716,6 +716,16 @@
                   >
                 </div>
                 <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price_kes) > 500 ? 'red darken-2' : ''" />
+                  <v-chip-group
+                     v-for="(feature, i) in plan.features" 
+                     key="feature-{{ i }}"
+                    class="mb-4 mb-sm-6"
+                    color="green lighten-2"
+                    column
+                    mandatory
+                  >
+                    <v-chip label color="white" class="red--text font-weight-bold">{{ feature }}</v-chip>
+                  </v-chip-group>
                 <v-list dense :dark="parseFloat(plan.price_kes) > 500" class="mb-6 mb-sm-8 transparent pa-0">
                   <v-list-item
                     v-for="feature in parseFeatures(plan.features)"

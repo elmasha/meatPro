@@ -106,7 +106,17 @@
                 {{ plan.description }}
               </p>
 
-              <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price_kes) > 10 ? 'red darken-2' : ''" />
+              <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price_kes) > 500 ? 'red darken-2' : ''" />
+                 <v-chip-group
+                     v-for="(feature, i) in plan.features"
+                     key="feature" 
+                    class="mb-4 mb-sm-6"
+                    color="green lighten-2"
+                    column
+                    mandatory
+                  >
+                    <v-chip label color="white" class="red--text font-weight-bold">{{ feature }}</v-chip>
+                  </v-chip-group>
                 <v-list dense :dark="parseFloat(plan.price_kes) > 10" class="mb-6 mb-sm-8 transparent pa-0">
                   <v-list-item
                     v-for="feature in parseFeatures(plan.features)"
