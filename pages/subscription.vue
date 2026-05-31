@@ -291,6 +291,7 @@ export default {
   
   data() {
     return {
+      checkOutRequestId: null,
       nav_bars: false,
       bottomNav: 3,
       shopName: 'Prime Cuts - CBD',
@@ -407,7 +408,8 @@ export default {
           plan_id: this.selectedPlan.id,
           phone: this.mpesaPhone
         });
-        
+        this.checkOutRequestId = data.checkOutRequestId;
+        console.log('Payment initiated:', data);
         if (this.demoMode) {
           setTimeout(async () => {
             await apiClient.post('/subscriptions/confirm', {
