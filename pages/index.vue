@@ -726,7 +726,7 @@
                   >
                     <v-chip label color="white" class="red--text font-weight-bold">{{ feature }}</v-chip>
                   </v-chip-group>
-                <v-list dense :dark="parseFloat(plan.price_kes) > 500" class="mb-6 mb-sm-8 transparent pa-0">
+                <!-- <v-list dense :dark="parseFloat(plan.price_kes) > 500" class="mb-6 mb-sm-8 transparent pa-0">
                   <v-list-item
                     v-for="feature in parseFeatures(plan.features)"
                     :key="feature"
@@ -735,7 +735,7 @@
                     <v-icon :color="parseFloat(plan.price_kes) > 500 ? 'green lighten-2' : 'green'" small class="mr-3">mdi-check-circle</v-icon>
                     <span class="text-body-2" :class="parseFloat(plan.price_kes) > 500 ? 'red--text text--lighten-4' : 'grey--text text--darken-1'">{{ feature }}</span>
                   </v-list-item>
-                </v-list>
+                </v-list> -->
                 <v-btn
                   block
                   :outlined="parseFloat(plan.price_kes) === 0"

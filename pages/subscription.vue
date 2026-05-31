@@ -108,8 +108,8 @@
 
               <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price_kes) > 500 ? 'red darken-2' : ''" />
                  <v-chip-group
-                     v-for="(feature, i) in plan.features"
-                     key="feature" 
+                    v-for="(feature, i) in plan.features"
+                    key="feature-{{ i }}"
                     class="mb-4 mb-sm-6"
                     color="green lighten-2"
                     column
