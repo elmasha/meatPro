@@ -100,7 +100,7 @@
                   </div>
                   <div class="d-flex align-center mt-1">
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
-                    <span class="text-caption grey--text text--darken-1">{{ shopName }}</span>
+                    <span class="text-caption grey--text text--darken-1">{{ shopName }} </span>
                   </div>
                 </div>
               </div>
@@ -192,6 +192,36 @@
                 @click="selectDate(yesterday)"
               >
                 Add Now
+              </v-btn>
+            </div>
+          </v-alert>
+        </v-slide-y-transition>
+
+        <v-slide-y-transition>
+          <v-alert
+            v-if="PaymentStatus"
+            dense
+            type="error"
+            class="mb-4 mb-sm-6 rounded-xl alert-modern"
+            text
+            border="left"
+            elevation="2"
+          >
+            <div class="d-flex align-center flex-wrap">
+              <span class="text-body-2 mr-2"
+                ><strong>Subscription Status</strong> 
+                <br>
+                {{ PaymentStatus }}.</span
+              >
+              <v-spacer />
+              <v-btn
+                small
+                text
+                color="error darken-1"
+                class="text-capitalize font-weight-bold mt-1 mt-sm-0"
+                to="/subscription"
+              >
+                Activate Subscription
               </v-btn>
             </div>
           </v-alert>
@@ -704,7 +734,7 @@
           </v-avatar>
           <div>
             <div class="text-h6 font-weight-bold red--text text--darken-2">MeatPro</div>
-            <div class="text-caption grey--text">{{ shopName }}</div>
+            <div class="text-caption grey--text">{{ shopName }} </div>
           </div>
         </div>
         <v-list dense class="pa-0">
@@ -1382,6 +1412,8 @@ export default {
 
       authUnsubscribe: null,
       mpesaReceipt:null,
+      subscription: null,
+      PaymentStatus: null,
 
       menuItems: [
         {
@@ -1593,8 +1625,8 @@ export default {
   methods: {
     checkPaymentInfo() {
       if (!this.mpesaReceipt) {
-        // this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
-        // this.$router.push('/subscription')
+        this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
+        this.$router.push('/subscription')
       }
     },
     formatNumber(val) {
@@ -1635,6 +1667,12 @@ export default {
       try {
         await this.loadUserProfile()
         if (this.branchId) {
+          if (this.subscription  !== 'pro') {
+            this.PaymentStatus = 'Your subscription is inactive. Please renew to access full features.';
+            this.showSnackbar('Your subscription is inactive. Please renew to access full features.', 'error');
+           // this.$router.push('/subscription')
+            return
+          }
           await Promise.all([
             this.checkPaymentInfo(),
             this.loadStats(),
@@ -1730,6 +1768,7 @@ export default {
         // Auto-set shop name and branch from profile if available
         if (data.business_name) this.shopName = data.business_name
         if (data.mpesa_receipt) this.mpesaReceipt = data.mpesa_receipt
+        if (data.subscription) this.subscription = data.subscription
         if (data.id) this.branchId = data.id
       } catch (e) {
         console.error('Profile load error:', e)

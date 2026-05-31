@@ -140,7 +140,7 @@
         </v-row>
 
         <!-- Payment History -->
-        <v-row>
+        <v-row v-show="false">
           <v-col cols="12">
             <v-card class="rounded-2xl" elevation="1">
               <v-card-title class="px-4 px-sm-6 py-4">
