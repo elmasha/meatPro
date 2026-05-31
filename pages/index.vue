@@ -718,7 +718,7 @@
                 <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price_kes) > 500 ? 'red darken-2' : ''" />
                   <v-chip-group
                      v-for="(feature, i) in plan.features" 
-                     key="feature-{{ i }}"
+                    :key="feature"
                     class="mb-1 mb-sm-1"
                     color="green lighten-2"
                     column
@@ -745,7 +745,7 @@
                   :x-large="!$vuetify.breakpoint.xs && !$vuetify.breakpoint.sm"
                   class="rounded-xl font-weight-bold text-capitalize"
                   :class="parseFloat(plan.price_kes) > 0 ? 'red--text hover-lift' : ''"
-                  @click="navigateTo(parseFloat(plan.price_kes) === 0 ? '/subscription' : '/subscription')"
+                  @click="navigateTo(parseFloat(plan.price_kes) === 0 ? '/dashboard' : '/dashboard')"
                 >
                   {{ parseFloat(plan.price_kes) === 0 ? 'Get Started' : 'Start 14-Day Trial' }}
                 </v-btn>

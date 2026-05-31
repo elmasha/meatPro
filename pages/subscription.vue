@@ -109,8 +109,7 @@
               <v-divider class="mb-4 mb-sm-6" :class="parseFloat(plan.price_kes) > 500 ? 'red darken-2' : ''" />
                  <v-chip-group
                     v-for="(feature, i) in plan.features"
-                    key="feature-{{ i }}"
-
+                    :key="feature"
                     class="mb-1 mb-sm-1"
                     color="green lighten-2"
                     column
@@ -234,6 +233,15 @@
           :rules="[v => /^254\d{9}$/.test(v) || 'Format: 254712345678']"
         />
 
+        <div v-if="timerEnabled" class="payment-wait text-center mb-2">
+                <div class="timer-ring">
+                    {{ timerCount }}
+                </div>
+
+                <h4>Waiting for M-Pesa confirmation</h4>
+                <p>Check your phone and enter your PIN.</p>
+            </div>
+
         <v-btn block x-large color="green darken-2" dark class="rounded-xl font-weight-bold text-capitalize mb-3 elevation-4" :loading="payLoading" @click="initiatePayment">
           <v-icon left>mdi-send</v-icon>
           Pay with M-Pesa
@@ -291,7 +299,10 @@ export default {
   
   data() {
     return {
-      checkOutRequestId: null,
+      timerEnabled: false,
+      timerCount: 25,
+
+      CheckoutRequestID: null,
       nav_bars: false,
       bottomNav: 3,
       shopName: 'Prime Cuts - CBD',
@@ -335,7 +346,29 @@ export default {
       authUnsubscribe: null
     }
   },
-  
+  watch: {
+    timerEnabled(value) {
+      if (value) {
+        setTimeout(() => {
+          this.timerCount--;
+        }, 1000);
+      }
+    },
+
+    timerCount: {
+      handler(value) {
+        if (value > 0 && this.timerEnabled) {
+          setTimeout(() => {
+            this.timerCount--;
+          }, 1000);
+        } else if (value === 0 && this.timerEnabled) {
+          this.StkQuery();
+          this.timerCount = 25;
+        }
+      },
+      immediate: true,
+    },
+  },
   computed: {
     statusCardClass() {
       if (!this.currentSub) return 'grey darken-2';
@@ -344,6 +377,40 @@ export default {
   },
   
   methods: {
+    async StkQuery() {
+      if (!this.CheckoutRequestID) return;
+
+     
+      this.showSnackbar('Checking payment status...', 'success');
+
+      try {
+        const response = await apiClient.post(`/subscriptions/query`, {
+          checkout_request_id: this.CheckoutRequestID,
+        });
+
+        this.timerCount = 25;
+        this.timerEnabled = false;
+        console.log("StkQuery response:", response.data);
+
+        // this.showSuccess(response.data.ResultDesc || "Payment status received.");
+        if (
+          response.data.result_code === "0" ||
+          response.data.result_code === 0
+        ) {
+          this.paymentDialog = false;
+          this.message = null;
+         this.showSnackbar('Payment successful! Pro features activated.', 'success');
+         
+        }else {
+          this.showSnackbar(response.data.result_desc, 'warning');
+        }
+      } catch (error) {
+        console.error("StkQuery error:", error);
+        this.timerCount = 25;
+        this.timerEnabled = false;
+        this.showError("Could not confirm query. Please try again.");
+      }
+    },
     formatNumber(val) { return numeral(val || 0).format('0,0'); },
     formatDate(date) { return date ? moment(date).format('MMM D, YYYY') : 'N/A'; },
     parseFeatures(featuresJson) {
@@ -408,7 +475,10 @@ export default {
           plan_id: this.selectedPlan.id,
           phone: this.mpesaPhone
         });
-        this.checkOutRequestId = data.checkOutRequestId;
+        this.CheckoutRequestID = data.checkout_request_id;
+       
+          this.timerEnabled = true;
+        
         console.log('Payment initiated:', data);
         if (this.demoMode) {
           setTimeout(async () => {
@@ -416,8 +486,8 @@ export default {
               subscription_id: data.subscription_id,
               firebase_uid: this.firebaseUid
             });
-            this.showSnackbar('Payment successful! Pro features activated.', 'success');
-            this.paymentDialog = false;
+            // this.showSnackbar('Payment successful! Pro features activated.', 'success');
+            // this.paymentDialog = false;
             await Promise.all([this.loadStatus(), this.loadPayments()]);
             this.payLoading = false;
           }, 2000);
@@ -480,6 +550,20 @@ export default {
 </script>
 
 <style scoped>
+.timer-ring {
+    width: 68px;
+    height: 68px;
+    border: 3px solid red;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 12px auto;
+    color: red;
+    font-weight: 900;
+    font-size: 1.35rem;
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.25);
+}
 .cursor-pointer { cursor: pointer; }
 .bg-grey-lighten-4 { background-color: #f5f5f5 !important; }
 .rounded-2xl { border-radius: 20px !important; }
