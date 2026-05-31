@@ -719,7 +719,7 @@
                   <v-chip-group
                      v-for="(feature, i) in plan.features" 
                      key="feature-{{ i }}"
-                    class="mb-4 mb-sm-6"
+                    class="mb-1 mb-sm-1"
                     color="green lighten-2"
                     column
                     mandatory

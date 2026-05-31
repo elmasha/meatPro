@@ -110,14 +110,15 @@
                  <v-chip-group
                     v-for="(feature, i) in plan.features"
                     key="feature-{{ i }}"
-                    class="mb-4 mb-sm-6"
+
+                    class="mb-1 mb-sm-1"
                     color="green lighten-2"
                     column
                     mandatory
                   >
                     <v-chip label color="white" class="red--text font-weight-bold">{{ feature }}</v-chip>
                   </v-chip-group>
-                <v-list dense :dark="parseFloat(plan.price_kes) > 10" class="mb-6 mb-sm-8 transparent pa-0">
+                <!-- <v-list dense :dark="parseFloat(plan.price_kes) > 10" class="mb-6 mb-sm-8 transparent pa-0">
                   <v-list-item
                     v-for="feature in parseFeatures(plan.features)"
                     :key="feature"
@@ -126,7 +127,7 @@
                     <v-icon :color="parseFloat(plan.price_kes) > 10 ? 'green lighten-2' : 'green'" small class="mr-3">mdi-check-circle</v-icon>
                     <span class="text-body-2" :class="parseFloat(plan.price_kes) > 10 ? 'red--text text--lighten-4' : 'grey--text text--darken-1'">{{ feature }}</span>
                   </v-list-item>
-                </v-list>
+                </v-list> -->
 
               <v-btn
                 v-if="plan.price_kes > 0"
