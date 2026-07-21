@@ -77,6 +77,19 @@
                                     <span class="text-caption grey--text text--darken-1">Last {{ periodDays }} days</span>
                                 </div>
                             </div>
+                            <div v-show="proStatus">
+                    <v-col cols="12" sm="8" class="pa-0 mt-2">
+          <v-autocomplete
+          clearable
+          @change="SelectionChange(selectedBranch)"
+            v-model="selectedBranch"
+            :items="branches.map(branch => branch.name)"
+            dense
+            filled
+            label="Select Branch"
+          ></v-autocomplete>
+        </v-col>
+                  </div>
                         </div>
                     </v-col>
                     <v-col cols="4" sm="6" class="d-flex justify-end align-center">
@@ -335,16 +348,16 @@
                             </div>
                             <v-spacer />
                             <v-chip small color="green lighten-5" text-color="green darken-2" label class="font-weight-bold">
-                                {{ paymentData.avgMpesaPct }}% M-Pesa
+                                {{ Math.abs(paymentData.avgMpesaPct) }}% M-Pesa
                             </v-chip>
                         </v-card-title>
                         <v-divider />
                         <v-card-text class="pa-4 pa-sm-6">
                             <div class="d-flex align-center justify-center mb-6">
                                 <div class="text-center mr-8">
-                                    <v-progress-circular :value="paymentData.avgMpesaPct" :size="110" :width="12" color="green" class="mb-2">
+                                    <v-progress-circular :value="Math.abs(paymentData.avgMpesaPct)" :size="110" :width="12" color="green" class="mb-2">
                                         <div class="text-h5 font-weight-bold green--text text--darken-2">
-                                            {{ paymentData.avgMpesaPct }}%
+                                            {{ Math.round(Math.abs(paymentData.avgMpesaPct)) }}%
                                         </div>
                                     </v-progress-circular>
                                     <div class="text-caption grey--text text--darken-1 font-weight-medium">
@@ -355,9 +368,9 @@
                                     </div>
                                 </div>
                                 <div class="text-center">
-                                    <v-progress-circular :value="100 - paymentData.avgMpesaPct" :size="110" :width="12" color="blue" class="mb-2">
+                                    <v-progress-circular :value="Math.abs(100 - paymentData.avgMpesaPct)" :size="110" :width="12" color="blue" class="mb-2">
                                         <div class="text-h5 font-weight-bold blue--text text--darken-2">
-                                            {{ 100 - paymentData.avgMpesaPct }}%
+                                            {{ Math.round(Math.abs(100 - paymentData.avgMpesaPct)) }}%
                                         </div>
                                     </v-progress-circular>
                                     <div class="text-caption grey--text text--darken-1 font-weight-medium">
@@ -670,6 +683,9 @@ export default {
 
     data() {
         return {
+            branches: [],
+            selectedBranch: null,
+            proStatus: false,
             mpesaReceipt: null,
             subscription: null,
             userProfile: null,
@@ -850,6 +866,16 @@ export default {
     },
 
     methods: {
+        async loadBranches() {
+      try {
+        if (!this.user?.uid) return
+        const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`)
+        this.branches = data
+        console.log('Branches loaded:', this.branches)
+      } catch (e) {
+        console.error('Branches load error:', e)
+      }
+    },
         checkPaymentInfo(val) {
             if (val == null) {
                 if (this.subscription === 'pro') {
@@ -921,7 +947,7 @@ export default {
                     this.loadProfitabilityAndSummary(),
                     this.loadWaste(),
                     this.loadPayment(),
-                    this.loadExpenses()
+                    this.loadExpenses(),
                 ])
             } finally {
                 this.loading = false

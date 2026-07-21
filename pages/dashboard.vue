@@ -102,6 +102,19 @@
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
                     <span class="text-caption grey--text text--darken-1">{{ shopName }} </span>
                   </div>
+                  <div v-show="proStatus">
+                    <v-col cols="12" sm="8" class="pa-0 mt-2">
+          <v-autocomplete
+          clearable
+          @change="SelectionChange(selectedBranch)"
+            v-model="selectedBranch"
+            :items="branches.map(branch => branch.name)"
+            dense
+            filled
+            label="Select Branch"
+          ></v-autocomplete>
+        </v-col>
+                  </div>
                 </div>
               </div>
             </v-col>
@@ -1303,6 +1316,8 @@ export default {
 
   data() {
     return {
+      proStatus: false,
+      branches: [],
       nav_bars: false,
       mobileDrawer: false,
       bottomNav: 0,
@@ -1319,7 +1334,7 @@ export default {
       isEditing: false,
       lastClosingStock: null,
       todayEntryTime: null,
-
+      selectedBranch: null,
       stats: {
         last: {
           revenue: 0,
@@ -1623,6 +1638,13 @@ export default {
   },
 
   methods: {
+    SelectionChange(value) {
+      if (!value) return
+      this.selectedBranch = value
+      this.branchId = value.id
+      this.refreshAll()
+      
+    },
     checkPaymentInfo() {
       if (!this.mpesaReceipt) {
         this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
@@ -1678,6 +1700,7 @@ export default {
             this.loadStats(),
             this.loadRecentEntries(),
             this.loadLastEntry(),
+            this.loadBranches(),
           ])
         }
       } catch (e) {
@@ -1765,6 +1788,11 @@ export default {
         const { data } = await apiClient.get(`/users/${this.user.uid}/profile`)
         this.userProfile = data
         console.log(data)
+        if (this.subscription === 'pro') {
+         this.proStatus = true
+         // this.$router.push('/subscription')
+          return
+        }
         // Auto-set shop name and branch from profile if available
         if (data.business_name) this.shopName = data.business_name
         if (data.mpesa_receipt) this.mpesaReceipt = data.mpesa_receipt
@@ -1774,6 +1802,17 @@ export default {
         console.error('Profile load error:', e)
       }
     },
+    async loadBranches() {
+      try {
+        if (!this.user?.uid) return
+        const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`)
+        this.branches = data
+        console.log('Branches loaded:', this.branches)
+      } catch (e) {
+        console.error('Branches load error:', e)
+      }
+    },
+       
     populateForm(entry) {
       this.form.opening_stock_kg = entry.opening_stock_kg || ''
       this.form.supply_kg = entry.supply_kg || ''
