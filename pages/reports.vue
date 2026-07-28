@@ -35,6 +35,21 @@
 
         <template v-slot:append>
             <div class="pa-4 pb-6">
+                <!-- Setup Branches button for Pro users -->
+                <v-slide-y-transition>
+                    <v-btn
+                        v-if="subData?.subscription?.tier === 'pro'"
+                        block
+                        color="red darken-2"
+                        dark
+                        class="rounded-xl text-capitalize font-weight-bold mb-3"
+                        to="/setupbranch"
+                    >
+                        <v-icon left small>mdi-store-plus</v-icon>
+                        Setup Branches
+                    </v-btn>
+                </v-slide-y-transition>
+
                 <v-card class="rounded-xl pa-3 red lighten-5" elevation="0">
                     <div class="d-flex align-center mb-2">
                         <v-icon color="red" small>mdi-headset</v-icon>
@@ -77,18 +92,22 @@
                                     <span class="text-caption grey--text text--darken-1">Last {{ periodDays }} days</span>
                                 </div>
                             </div>
-                            <div v-show="proStatus">
-                    <v-col cols="12" sm="8" class="pa-0 mt-2">
-          <v-autocomplete
-          clearable
-          @change="SelectionChange(selectedBranch)"
-            v-model="selectedBranch"
-            :items="branches.map(branch => branch.name)"
-            dense
-            filled
-            label="Select Branch"
-          ></v-autocomplete>
-        </v-col>
+                            
+                            
+                        </div>
+                        <div>
+                            <div v-if="proStatus === true">
+                    <v-col cols="12" sm="4" class="pa-0 mt-2" >
+                      <v-autocomplete
+                        clearable
+                        @change="SelectionChange(selectedBranch)"
+                        v-model="selectedBranch"
+                        :items="branches.map(branch => branch.name)"
+                        dense
+                        filled
+                        label="Select Branch"
+                      ></v-autocomplete>
+                    </v-col>
                   </div>
                         </div>
                     </v-col>
@@ -648,6 +667,22 @@
                 </v-list-item>
             </v-list>
             <v-divider class="my-4" />
+
+            <!-- Setup Branches for Pro users -->
+            <v-slide-y-transition>
+                <v-btn
+                    v-if="subData?.subscription?.tier === 'pro'"
+                    block
+                    color="red darken-2"
+                    dark
+                    class="rounded-xl text-capitalize font-weight-bold mb-3"
+                    to="/setupbranch"
+                >
+                    <v-icon left small>mdi-store-plus</v-icon>
+                    Setup Branches
+                </v-btn>
+            </v-slide-y-transition>
+
             <v-btn block outlined color="grey darken-1" class="rounded-xl text-capitalize" @click="logout">
                 <v-icon left size="18">mdi-logout</v-icon> Sign Out
             </v-btn>
@@ -683,6 +718,11 @@ export default {
 
     data() {
         return {
+            // ── Subscription Gate ──
+            subLoading: true,
+            subActive: false,
+            subData: null,
+            // ── Existing Data ──
             branches: [],
             selectedBranch: null,
             proStatus: false,
@@ -867,15 +907,29 @@ export default {
 
     methods: {
         async loadBranches() {
-      try {
-        if (!this.user?.uid) return
-        const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`)
-        this.branches = data
-        console.log('Branches loaded:', this.branches)
-      } catch (e) {
-        console.error('Branches load error:', e)
-      }
-    },
+            try {
+                if (!this.user?.uid) return
+                const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`)
+                this.branches = data || []
+                console.log('Branches loaded:', this.branches)
+
+                // Auto-select first branch if selector is currently empty
+                if (!this.selectedBranch && this.branches.length > 0) {
+                    const first = this.branches[0]
+                    this.selectedBranch = first.name
+                    this.branchId = first.id
+                } else if (this.branchId && this.branches.length) {
+                    // Sync the dropdown label to the currently active branchId
+                    const current = this.branches.find(b => b.id === this.branchId)
+                    if (current) {
+                        this.selectedBranch = current.name
+                    }
+                }
+            } catch (e) {
+                console.error('Branches load error:', e)
+                this.branches = []
+            }
+        },
         checkPaymentInfo(val) {
             if (val == null) {
                 if (this.subscription === 'pro') {
@@ -941,6 +995,14 @@ export default {
         async refreshAll() {
             if (this.loading) return
             this.loading = true
+
+             await this.loadUserProfile()
+
+        // Load branches for Pro subscribers; auto-select if empty
+        if (this.proStatus === true) {
+          await this.loadBranches()
+        }
+
             try {
                 await Promise.all([
                     this.loadComparative(),
@@ -1088,19 +1150,50 @@ export default {
             this.$fire.auth.signOut()
             this.$router.push('/login')
         },
+        async checkSubscription() {
+            this.subLoading = true
+            try {
+                if (!this.user?.uid) {
+                    this.subActive = false
+                    return
+                }
+                const { data } = await apiClient.get(`/subscriptions/status?firebase_uid=${this.user.uid}`)
+                this.subData = data
+                this.subActive = data?.is_active === true
+            } catch (e) {
+                console.error('Subscription check error:', e)
+                this.subActive = false
+                this.subData = null
+            } finally {
+                this.subLoading = false
+            }
+        },
+
+        SelectionChange(branchName) {
+            if (!branchName) return
+            const branch = this.branches.find(b => b.name === branchName)
+            if (!branch) return
+            this.selectedBranch = branchName
+            this.branchId = branch.id
+            this.refreshAll()
+        },
+
         async loadUserProfile() {
             try {
-                if (!this.user.uid) return
-                const {
-                    data
-                } = await apiClient.get(`/users/${this.user.uid}/profile`)
+                if (!this.user?.uid) return
+                const { data } = await apiClient.get(`/users/${this.user.uid}/profile`)
                 this.userProfile = data
-                if (data.id) {
-                    this.branchId = data.id
-                    this.mpesaReceipt = data.mpesa_receipt
-                    this.subscription = data.subscription
-                    this.checkPaymentInfo(this.mpesaReceipt);
-                    this.refreshAll()
+                if (data.subscription === 'pro') {
+                    this.proStatus = true
+                }else {
+                    this.proStatus = false
+                }
+                if (data.business_name) this.shopName = data.business_name
+                if (data.mpesa_receipt) this.mpesaReceipt = data.mpesa_receipt
+                if (data.subscription) this.subscription = data.subscription
+                // Only set default branchId from profile if user hasn't selected one yet
+                if (data.branch_id && !this.branchId) {
+                    this.branchId = data.branch_id
                 }
             } catch (e) {
                 console.error('Profile load error:', e)
@@ -1115,11 +1208,31 @@ export default {
         this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
             if (user) {
                 this.user = user
-                this.loadUserProfile()
+                // Check subscription first, then load data
+                this.checkSubscription().then(() => {
+                    this.loadUserProfile()
+                    // Load branches for Pro subscribers; auto-select if empty
+                    if (this.subData?.subscription?.tier === 'pro') {
+                        this.loadBranches().then(() => {
+                            this.refreshAll()
+                        })
+                    } else {
+                        this.refreshAll()
+                    }
+                })
             } else {
                 this.$router.push('/login')
             }
         })
+    },
+
+    watch: {
+        selectedBranch(newVal, oldVal) {
+            // If user clears the selector, reload branches and auto-select first one
+            if (!newVal && oldVal && this.subData?.subscription?.tier === 'pro') {
+                this.loadBranches()
+            }
+        },
     },
 
     beforeDestroy() {

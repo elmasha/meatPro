@@ -49,6 +49,9 @@
 
       <template v-slot:append>
         <div class="pa-4 pb-6">
+          <!-- Setup Branches button for Pro users -->
+            
+
           <v-card class="rounded-xl pa-3 red lighten-5" elevation="0">
             <div class="d-flex align-center mb-2">
               <v-icon color="red" small>mdi-headset</v-icon>
@@ -102,9 +105,10 @@
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
                     <span class="text-caption grey--text text--darken-1">{{ shopName }} </span>
                   </div>
-                  <div v-show="subActive">
-                    <v-col cols="12" sm="8" class="pa-0 mt-2">
+                  <div v-if="proStatus === true">
+                    <v-col cols="12" sm="8" class="pa-0 mt-10" >
                       <v-autocomplete
+                        v-show="proStatus"
                         clearable
                         @change="SelectionChange(selectedBranch)"
                         v-model="selectedBranch"
@@ -119,6 +123,17 @@
               </div>
             </v-col>
             <v-col cols="4" sm="6" class="d-flex justify-end align-center">
+              <v-btn
+              v-if="proStatus === true"
+              color="red darken-2"
+              dark
+              icon
+              class="rounded-xl text-capitalize font-weight-bold mb-0"
+              to="/setupbranch"
+            >
+              <v-icon left small>mdi-store-plus</v-icon>
+              
+            </v-btn>
               <v-btn
                 icon
                 outlined
@@ -797,6 +812,22 @@
           </v-list-item>
         </v-list>
         <v-divider class="my-4" />
+
+        <!-- Setup Branches for Pro users -->
+        <v-slide-y-transition>
+          <v-btn
+            v-if="proStatus === true"
+            block
+            color="red darken-2"
+            dark
+            class="rounded-xl text-capitalize font-weight-bold mb-3"
+            to="/setupbranch"
+          >
+            <v-icon left small>mdi-store-plus</v-icon>
+            Setup Branches
+          </v-btn>
+        </v-slide-y-transition>
+
         <v-btn
           block
           outlined
@@ -1350,7 +1381,9 @@ export default {
       subLoading: true,
       subActive: false,
       subData: null,
-      // ── Existing Data ───────────────────────────────────────────
+      userProfile: null,
+      // ── Existing Data ───────────────────────────────────────────    userProfile: null,
+
       proStatus: false,
       branches: [],
       nav_bars: false,
@@ -1684,19 +1717,18 @@ export default {
       this.loading = true
       try {
         await this.loadUserProfile()
+
+        // Load branches for Pro subscribers; auto-select if empty
+        if (this.proStatus === true) {
+          await this.loadBranches()
+        }
+
+        // Load branch-specific stats only when a branch is chosen
         if (this.branchId) {
-          if (this.subscription !== 'pro') {
-            this.PaymentStatus = 'Your subscription is inactive. Please renew to access full features.'
-            this.showSnackbar('Your subscription is inactive. Please renew to access full features.', 'error')
-            return
-          }
           await Promise.all([
-            this.loadUserProfile(),
-            this.checkPaymentInfo(),
             this.loadStats(),
             this.loadRecentEntries(),
             this.loadLastEntry(),
-            this.loadBranches(),
           ])
         }
       } catch (e) {
@@ -1780,7 +1812,9 @@ export default {
         console.log(data)
 
         if (data.subscription === 'pro') {
-          this.proStatus = true
+          this.proStatus = true;
+        }else {
+          this.proStatus = false;
         }
 
         if (data.business_name) this.shopName = data.business_name
@@ -1788,8 +1822,8 @@ export default {
         if (data.subscription) this.subscription = data.subscription
 
         // Only set default branchId from profile if user hasn't selected one yet
-        if (data.id && !this.branchId) {
-          this.branchId = data.id
+        if (data.branch_id && !this.branchId) {
+          this.branchId = data.branch_id
         }
       } catch (e) {
         console.error('Profile load error:', e)
@@ -1803,8 +1837,13 @@ export default {
         this.branches = data || []
         console.log('Branches loaded:', this.branches)
 
-        // Sync the dropdown label to the currently active branchId
-        if (this.branchId && this.branches.length) {
+        // Auto-select first branch if selector is currently empty
+        if (!this.selectedBranch && this.branches.length > 0) {
+          const first = this.branches[0]
+          this.selectedBranch = first.name
+          this.branchId = first.id
+        } else if (this.branchId && this.branches.length) {
+          // Sync the dropdown label to the currently active branchId
           const current = this.branches.find(b => b.id === this.branchId)
           if (current) {
             this.selectedBranch = current.name
@@ -1939,6 +1978,12 @@ export default {
   },
 
   watch: {
+    selectedBranch(newVal, oldVal) {
+      // If user clears the selector, reload branches and auto-select first one
+      if (!newVal && oldVal && this.subData?.subscription?.tier === 'pro') {
+        this.loadBranches()
+      }
+    },
     searchDate2(newDate) {
       this.form.date = newDate
       const entry = this.recentEntries.find((e) => e.date === newDate)
