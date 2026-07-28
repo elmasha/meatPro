@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="d-flex bg-grey-lighten-4 dashboard-root" style="min-height: 100vh;">
     <!-- Desktop Sidebar -->
     <v-navigation-drawer
@@ -102,18 +102,18 @@
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
                     <span class="text-caption grey--text text--darken-1">{{ shopName }} </span>
                   </div>
-                  <div v-show="proStatus">
+                  <div v-show="subActive">
                     <v-col cols="12" sm="8" class="pa-0 mt-2">
-          <v-autocomplete
-          clearable
-          @change="SelectionChange(selectedBranch)"
-            v-model="selectedBranch"
-            :items="branches.map(branch => branch.name)"
-            dense
-            filled
-            label="Select Branch"
-          ></v-autocomplete>
-        </v-col>
+                      <v-autocomplete
+                        clearable
+                        @change="SelectionChange(selectedBranch)"
+                        v-model="selectedBranch"
+                        :items="branches.map(branch => branch.name)"
+                        dense
+                        filled
+                        label="Select Branch"
+                      ></v-autocomplete>
+                    </v-col>
                   </div>
                 </div>
               </div>
@@ -179,10 +179,50 @@
       </div>
 
       <v-container :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
+        <!-- SUBSCRIPTION BANNER: shown when inactive -->
+        <v-slide-y-transition>
+          <v-alert
+            v-if="!subActive && !subLoading"
+            dense
+            type="error"
+            class="mb-4 mb-sm-6 rounded-xl alert-modern"
+            text
+            border="left"
+            colored-border
+            elevation="2"
+          >
+            <div class="d-flex align-center flex-wrap">
+              <v-avatar color="red lighten-5" size="40" class="mr-3 hidden-xs-only">
+                <v-icon color="red darken-2">mdi-lock-alert</v-icon>
+              </v-avatar>
+              <div class="flex-grow-1">
+                <div class="text-body-1 font-weight-bold grey--text text--darken-2">
+                  Subscription Required
+                </div>
+                <div class="text-body-2 grey--text text--darken-1">
+                  {{ subData?.subscription?.status === 'cancelled' 
+                    ? 'Your subscription was cancelled. Renew to continue recording daily entries.' 
+                    : 'Activate a Pro subscription to record daily stock, sales, and expenses.' }}
+                </div>
+              </div>
+              <v-btn
+                small
+                color="red darken-2"
+                dark
+                class="text-capitalize font-weight-bold rounded-lg mt-2 mt-sm-0"
+                to="/subscription"
+              >
+                <v-icon left small>mdi-crown</v-icon>
+                {{ subData?.subscription?.status === 'cancelled' ? 'Renew Now' : 'Activate Now' }}
+              </v-btn>
+            </div>
+          </v-alert>
+        </v-slide-y-transition>
+
         <!-- Missed Entry Alert -->
         <v-slide-y-transition>
           <v-alert
-            v-if="showMissedEntryAlert"
+            v-if="showMissedEntryAlert && subActive"
             dense
             type="warning"
             class="mb-4 mb-sm-6 rounded-xl alert-modern"
@@ -205,36 +245,6 @@
                 @click="selectDate(yesterday)"
               >
                 Add Now
-              </v-btn>
-            </div>
-          </v-alert>
-        </v-slide-y-transition>
-
-        <v-slide-y-transition>
-          <v-alert
-            v-if="PaymentStatus"
-            dense
-            type="error"
-            class="mb-4 mb-sm-6 rounded-xl alert-modern"
-            text
-            border="left"
-            elevation="2"
-          >
-            <div class="d-flex align-center flex-wrap">
-              <span class="text-body-2 mr-2"
-                ><strong>Subscription Status</strong> 
-                <br>
-                {{ PaymentStatus }}.</span
-              >
-              <v-spacer />
-              <v-btn
-                small
-                text
-                color="error darken-1"
-                class="text-capitalize font-weight-bold mt-1 mt-sm-0"
-                to="/subscription"
-              >
-                Activate Subscription
               </v-btn>
             </div>
           </v-alert>
@@ -297,7 +307,7 @@
           </v-col>
         </v-row>
 
-        <!-- Main Action -->
+        <!-- Main Action: LOCKED if no subscription -->
         <v-row class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 200ms">
           <v-col cols="12">
             <v-hover v-slot="{ hover }">
@@ -305,57 +315,66 @@
                 class="rounded-xl overflow-hidden action-card-modern"
                 elevation="3"
                 :class="{
-                  'action-complete': todayEntryExists,
-                  'action-pending': !todayEntryExists,
-                  'elevation-8': hover && !todayEntryExists,
+                  'action-complete': todayEntryExists && subActive,
+                  'action-pending': !todayEntryExists && subActive,
+                  'action-locked': !subActive,
+                  'elevation-8': hover && !todayEntryExists && subActive,
                 }"
               >
                 <v-card-text class="pa-0">
                   <v-btn
                     block
                     x-large
-                    :color="todayEntryExists ? 'grey lighten-3' : 'red darken-2'"
-                    :dark="!todayEntryExists"
+                    :color="!subActive ? 'grey lighten-3' : todayEntryExists ? 'grey lighten-3' : 'red darken-2'"
+                    :dark="subActive && !todayEntryExists"
                     elevation="0"
                     class="rounded-0 py-6 py-sm-7 action-btn-modern"
-                    @click="openCloseDay"
-                    :disabled="todayEntryExists && !isEditing"
+                    @click="subActive ? openCloseDay() : $router.push('/subscription')"
                   >
                     <div class="d-flex align-center justify-center w-100 px-4">
                       <v-avatar
-                        :color="todayEntryExists ? 'grey' : 'white'"
+                        :color="!subActive ? 'grey' : todayEntryExists ? 'grey' : 'white'"
                         size="52"
                         class="mr-4 action-avatar"
                       >
                         <v-icon
-                          :color="todayEntryExists ? 'white' : 'red darken-2'"
+                          :color="!subActive ? 'white' : todayEntryExists ? 'white' : 'red darken-2'"
                           size="28"
                         >
-                          {{ todayEntryExists ? 'mdi-check-circle' : 'mdi-store-check' }}
+                          {{ !subActive ? 'mdi-lock' : todayEntryExists ? 'mdi-check-circle' : 'mdi-store-check' }}
                         </v-icon>
                       </v-avatar>
                       <div class="text-left flex-grow-1">
                         <div class="text-h6 text-sm-h5 font-weight-bold">
                           {{
-                            todayEntryExists ? "Today's Entry Complete" : 'Close Business Day'
+                            !subActive 
+                              ? 'Activate Subscription to Record' 
+                              : todayEntryExists 
+                                ? "Today's Entry Complete" 
+                                : 'Close Business Day'
                           }}
                         </div>
                         <div
                           class="text-caption mt-1"
                           :class="
-                            todayEntryExists ? 'grey--text' : 'red--text text--lighten-4'
+                            !subActive 
+                              ? 'grey--text' 
+                              : todayEntryExists 
+                                ? 'grey--text' 
+                                : 'red--text text--lighten-4'
                           "
                         >
                           {{
-                            todayEntryExists
-                              ? `Recorded at ${todayEntryTime}`
-                              : 'Record stock, sales & expenses to lock in your daily numbers'
+                            !subActive
+                              ? 'Upgrade to Pro to unlock daily stock & sales recording'
+                              : todayEntryExists
+                                ? `Recorded at ${todayEntryTime}`
+                                : 'Record stock, sales & expenses to lock in your daily numbers'
                           }}
                         </div>
                       </div>
-                      <v-icon v-if="!todayEntryExists" large class="ml-2"
-                        >mdi-arrow-right</v-icon
-                      >
+                      <v-icon v-if="!subActive" large class="ml-2">mdi-arrow-right</v-icon>
+                      <v-icon v-else-if="!todayEntryExists" large class="ml-2">mdi-arrow-right</v-icon>
                       <v-chip
                         v-else
                         small
@@ -676,6 +695,7 @@
                     color="grey lighten-1"
                     class="hover-red"
                     @click="editEntry(item)"
+                    :disabled="!subActive"
                   >
                     <v-icon x-small>mdi-pencil</v-icon>
                   </v-btn>
@@ -685,15 +705,25 @@
                     <v-icon size="48" color="grey lighten-2">mdi-calendar-blank</v-icon>
                     <div class="text-h6 grey--text mt-3">No entries yet</div>
                     <div class="text-body-2 grey--text text--lighten-1 mb-4">
-                      Start by closing today's business day
+                      {{ subActive ? 'Start by closing today\'s business day' : 'Activate subscription to start recording' }}
                     </div>
                     <v-btn
+                      v-if="subActive"
                       color="red darken-2"
                       dark
                       class="rounded-lg text-capitalize"
                       @click="openCloseDay"
                     >
                       <v-icon left>mdi-plus</v-icon> Add First Entry
+                    </v-btn>
+                    <v-btn
+                      v-else
+                      color="red darken-2"
+                      dark
+                      class="rounded-lg text-capitalize"
+                      to="/subscription"
+                    >
+                      <v-icon left>mdi-crown</v-icon> Activate Subscription
                     </v-btn>
                   </div>
                 </template>
@@ -718,9 +748,9 @@
         <span>Home</span>
         <v-icon>mdi-home</v-icon>
       </v-btn>
-      <v-btn @click="openCloseDay">
+      <v-btn @click="subActive ? openCloseDay() : $router.push('/subscription')">
         <span>Close</span>
-        <v-icon>mdi-plus-circle</v-icon>
+        <v-icon>{{ subActive ? 'mdi-plus-circle' : 'mdi-lock' }}</v-icon>
       </v-btn>
       <v-btn to="/reports">
         <span>Reports</span>
@@ -1316,6 +1346,11 @@ export default {
 
   data() {
     return {
+      // ── Subscription Gate ───────────────────────────────────────
+      subLoading: true,
+      subActive: false,
+      subData: null,
+      // ── Existing Data ───────────────────────────────────────────
       proStatus: false,
       branches: [],
       nav_bars: false,
@@ -1336,21 +1371,9 @@ export default {
       todayEntryTime: null,
       selectedBranch: null,
       stats: {
-        last: {
-          revenue: 0,
-          cost: 0,
-          margin: 0,
-        },
-        week: {
-          revenue: 0,
-          cost: 0,
-          margin: 0,
-        },
-        month: {
-          revenue: 0,
-          cost: 0,
-          margin: 0,
-        },
+        last: { revenue: 0, cost: 0, margin: 0 },
+        week: { revenue: 0, cost: 0, margin: 0 },
+        month: { revenue: 0, cost: 0, margin: 0 },
       },
       todayStats: {
         revenue: 0,
@@ -1360,10 +1383,7 @@ export default {
         mpesa: 0,
         cash: 0,
       },
-      weekTrend: {
-        revenue: 0,
-      },
-
+      weekTrend: { revenue: 0 },
       form: {
         date: moment().format('YYYY-MM-DD'),
         opening_stock_kg: '',
@@ -1375,77 +1395,27 @@ export default {
         payment_cash: 0,
         payment_mpesa: 0,
       },
-
-      expenseForm: {
-        title: '',
-        amount: '',
-      },
+      expenseForm: { title: '', amount: '' },
       todayExpenses: [],
       expenseTypes: ['rent', 'shopping', 'gas', 'labour', 'charcoal', 'electricity', 'other'],
-
       headers: [
-        {
-          text: 'Date',
-          value: 'date',
-          width: '120',
-        },
-        {
-          text: 'Sold',
-          value: 'sold_kg',
-          align: 'end',
-        },
-        {
-          text: 'Revenue',
-          value: 'revenue',
-          align: 'end',
-        },
-        {
-          text: 'Profit',
-          value: 'profit',
-          align: 'end',
-        },
-        {
-          text: 'Closing',
-          value: 'closing_stock_kg',
-          align: 'end',
-        },
-        {
-          text: '',
-          value: 'actions',
-          align: 'end',
-          sortable: false,
-          width: '40',
-        },
+        { text: 'Date', value: 'date', width: '120' },
+        { text: 'Sold', value: 'sold_kg', align: 'end' },
+        { text: 'Revenue', value: 'revenue', align: 'end' },
+        { text: 'Profit', value: 'profit', align: 'end' },
+        { text: 'Closing', value: 'closing_stock_kg', align: 'end' },
+        { text: '', value: 'actions', align: 'end', sortable: false, width: '40' },
       ],
       recentEntries: [],
-
-      snackbar: {
-        show: false,
-        text: '',
-        color: 'success',
-      },
-
+      snackbar: { show: false, text: '', color: 'success' },
       authUnsubscribe: null,
-      mpesaReceipt:null,
+      mpesaReceipt: null,
       subscription: null,
       PaymentStatus: null,
-
       menuItems: [
-        {
-          title: 'Dashboard',
-          icon: 'mdi-view-dashboard',
-          to: '/dashboard',
-        },
-        {
-          title: 'Reports',
-          icon: 'mdi-chart-line',
-          to: '/reports',
-        },
-        {
-          title: 'Profile',
-          icon: 'mdi-account',
-          to: '/profile',
-        },
+        { title: 'Dashboard', icon: 'mdi-view-dashboard', to: '/dashboard' },
+        { title: 'Reports', icon: 'mdi-chart-line', to: '/reports' },
+        { title: 'Profile', icon: 'mdi-account', to: '/profile' },
       ],
     }
   },
@@ -1489,8 +1459,7 @@ export default {
       return this.todayExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
     },
     wastePct() {
-      const total =
-        (parseFloat(this.form.opening_stock_kg) || 0) + (parseFloat(this.form.supply_kg) || 0)
+      const total = (parseFloat(this.form.opening_stock_kg) || 0) + (parseFloat(this.form.supply_kg) || 0)
       if (!total) return 0
       return (((parseFloat(this.form.waste_kg) || 0) / total) * 100).toFixed(1)
     },
@@ -1516,10 +1485,7 @@ export default {
     },
     avgDailyRevenue() {
       if (!this.recentEntries.length) return 0
-      const total = this.recentEntries.reduce(
-        (sum, e) => sum + (parseFloat(e.revenue) || 0),
-        0
-      )
+      const total = this.recentEntries.reduce((sum, e) => sum + (parseFloat(e.revenue) || 0), 0)
       return total / this.recentEntries.length
     },
     filteredEntries() {
@@ -1605,64 +1571,99 @@ export default {
     },
     confirmRows() {
       return [
-        {
-          label: 'Volume Sold',
-          value: `${this.volumeSold} kg`,
-          class: 'grey--text text--darken-2',
-        },
-        {
-          label: 'Revenue',
-          value: this.formatNumber(this.expectedRevenue),
-          class: 'grey--text text--darken-2',
-        },
-        {
-          label: 'Cost of Goods',
-          value: this.formatNumber(this.expectedCost),
-          class: 'grey--text text--darken-2',
-        },
-        {
-          label: 'Expenses',
-          value: this.formatNumber(this.todayExpenseTotal),
-          class: 'grey--text text--darken-2',
-        },
+        { label: 'Volume Sold', value: `${this.volumeSold} kg`, class: 'grey--text text--darken-2' },
+        { label: 'Revenue', value: this.formatNumber(this.expectedRevenue), class: 'grey--text text--darken-2' },
+        { label: 'Cost of Goods', value: this.formatNumber(this.expectedCost), class: 'grey--text text--darken-2' },
+        { label: 'Expenses', value: this.formatNumber(this.todayExpenseTotal), class: 'grey--text text--darken-2' },
         {
           label: 'Net Profit',
           value: this.formatNumber(this.expectedProfit),
-          class:
-            this.expectedProfit >= 0
-              ? 'green--text font-weight-bold'
-              : 'red--text font-weight-bold',
+          class: this.expectedProfit >= 0 ? 'green--text font-weight-bold' : 'red--text font-weight-bold',
         },
       ]
     },
   },
 
   methods: {
-    SelectionChange(value) {
-      if (!value) return
-      this.selectedBranch = value
-      this.branchId = value.id
-      this.refreshAll()
-      
+    // ── Subscription Gate ───────────────────────────────────────
+    async checkSubscription() {
+      this.subLoading = true
+      try {
+        if (!this.user?.uid) {
+          this.subActive = false
+          return
+        }
+        const { data } = await apiClient.get(`/subscriptions/status?firebase_uid=${this.user.uid}`)
+        this.subData = data
+        this.subActive = data?.is_active === true
+      } catch (e) {
+        console.error('Subscription check error:', e)
+        this.subActive = false
+        this.subData = null
+      } finally {
+        this.subLoading = false
+      }
     },
+
+    SelectionChange(branchName) {
+      if (!branchName) return
+      const branch = this.branches.find(b => b.name === branchName)
+      if (!branch) return
+
+      // Reset all dashboard data before loading the new branch
+      this.resetDashboardData()
+
+      this.selectedBranch = branchName
+      this.branchId = branch.id
+      this.refreshAll()
+    },
+
+    resetDashboardData() {
+      this.recentEntries = []
+      this.todayExpenses = []
+      this.lastClosingStock = null
+      this.todayEntryTime = null
+      this.isEditing = false
+      this.stats = {
+        last: { revenue: 0, cost: 0, margin: 0 },
+        week: { revenue: 0, cost: 0, margin: 0 },
+        month: { revenue: 0, cost: 0, margin: 0 },
+      }
+      this.todayStats = {
+        revenue: 0,
+        profit: 0,
+        marginPct: 0,
+        wasteKg: 0,
+        mpesa: 0,
+        cash: 0,
+      }
+      this.weekTrend = { revenue: 0 }
+      this.resetForm()
+    },
+
     checkPaymentInfo() {
       if (!this.mpesaReceipt) {
         this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
         this.$router.push('/subscription')
       }
     },
+
     formatNumber(val) {
       return numeral(val || 0).format('0,0')
     },
+
     formatDateShort(date) {
       return moment(date).format('MMM D, YYYY')
     },
+
     formatDay(date) {
       return moment(date).format('D')
     },
+
     formatDayName(date) {
       return moment(date).format('dddd')
     },
+
     dateColor(date) {
       const day = moment(date).day()
       return day === 0 || day === 6 ? 'red lighten-4' : 'grey lighten-3'
@@ -1670,15 +1671,10 @@ export default {
 
     async apiCall(method, endpoint, data = null) {
       try {
-        const response = await apiClient.request({
-          method,
-          url: endpoint,
-          data,
-        })
+        const response = await apiClient.request({ method, url: endpoint, data })
         return response.data
       } catch (error) {
-        const msg = error.response.data.message || error.message
-        //this.showSnackbar(msg, 'error')
+        const msg = error.response?.data?.message || error.message
         throw error
       }
     },
@@ -1689,13 +1685,13 @@ export default {
       try {
         await this.loadUserProfile()
         if (this.branchId) {
-          if (this.subscription  !== 'pro') {
-            this.PaymentStatus = 'Your subscription is inactive. Please renew to access full features.';
-            this.showSnackbar('Your subscription is inactive. Please renew to access full features.', 'error');
-           // this.$router.push('/subscription')
+          if (this.subscription !== 'pro') {
+            this.PaymentStatus = 'Your subscription is inactive. Please renew to access full features.'
+            this.showSnackbar('Your subscription is inactive. Please renew to access full features.', 'error')
             return
           }
           await Promise.all([
+            this.loadUserProfile(),
             this.checkPaymentInfo(),
             this.loadStats(),
             this.loadRecentEntries(),
@@ -1740,10 +1736,7 @@ export default {
 
     async loadRecentEntries() {
       try {
-        const entries = await this.apiCall(
-          'get',
-          `/daily-operations?branch_id=${this.branchId}`
-        )
+        const entries = await this.apiCall('get', `/daily-operations?branch_id=${this.branchId}`)
         this.recentEntries = Object.freeze(entries || [])
         console.log('Recent entries', this.recentEntries)
         const todayEntry = this.recentEntries.find((e) => e.date === this.searchDate2)
@@ -1758,17 +1751,13 @@ export default {
 
     async loadLastEntry() {
       try {
-        const entry = await this.apiCall(
-          'get',
-          `/daily-operations/last?branch_id=${this.branchId}`
-        )
+        const entry = await this.apiCall('get', `/daily-operations/last?branch_id=${this.branchId}`)
         console.log('Last entry', entry)
         if (entry) {
           this.lastClosingStock = entry.closing_stock_kg
           if (!this.form.opening_stock_kg && this.isToday && !this.isEditing) {
             this.form.opening_stock_kg = entry.closing_stock_kg
           }
-
           this.todayStats = {
             revenue: parseFloat(entry.revenue) || 0,
             profit: parseFloat(entry.profit) || 0,
@@ -1782,37 +1771,51 @@ export default {
         console.error('Last entry error', e)
       }
     },
+
     async loadUserProfile() {
       try {
         if (!this.user?.uid) return
         const { data } = await apiClient.get(`/users/${this.user.uid}/profile`)
         this.userProfile = data
         console.log(data)
-        if (this.subscription === 'pro') {
-         this.proStatus = true
-         // this.$router.push('/subscription')
-          return
+
+        if (data.subscription === 'pro') {
+          this.proStatus = true
         }
-        // Auto-set shop name and branch from profile if available
+
         if (data.business_name) this.shopName = data.business_name
         if (data.mpesa_receipt) this.mpesaReceipt = data.mpesa_receipt
         if (data.subscription) this.subscription = data.subscription
-        if (data.id) this.branchId = data.id
+
+        // Only set default branchId from profile if user hasn't selected one yet
+        if (data.id && !this.branchId) {
+          this.branchId = data.id
+        }
       } catch (e) {
         console.error('Profile load error:', e)
       }
     },
+
     async loadBranches() {
       try {
         if (!this.user?.uid) return
         const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`)
-        this.branches = data
+        this.branches = data || []
         console.log('Branches loaded:', this.branches)
+
+        // Sync the dropdown label to the currently active branchId
+        if (this.branchId && this.branches.length) {
+          const current = this.branches.find(b => b.id === this.branchId)
+          if (current) {
+            this.selectedBranch = current.name
+          }
+        }
       } catch (e) {
         console.error('Branches load error:', e)
+        this.branches = []
       }
     },
-       
+
     populateForm(entry) {
       this.form.opening_stock_kg = entry.opening_stock_kg || ''
       this.form.supply_kg = entry.supply_kg || ''
@@ -1852,10 +1855,7 @@ export default {
         title: this.expenseForm.title,
         amount: parseFloat(this.expenseForm.amount),
       })
-      this.expenseForm = {
-        title: '',
-        amount: '',
-      }
+      this.expenseForm = { title: '', amount: '' }
     },
     removeExpense(index) {
       this.todayExpenses.splice(index, 1)
@@ -1896,10 +1896,7 @@ export default {
             )
           )
         }
-        this.showSnackbar(
-          this.isEditing ? 'Day updated!' : 'Day closed successfully!',
-          'success'
-        )
+        this.showSnackbar(this.isEditing ? 'Day updated!' : 'Day closed successfully!', 'success')
         this.showForm = false
         this.todayExpenses = []
         this.isEditing = false
@@ -1925,11 +1922,7 @@ export default {
       }
     },
     showSnackbar(text, color = 'success') {
-      this.snackbar = {
-        show: true,
-        text,
-        color,
-      }
+      this.snackbar = { show: true, text, color }
     },
     editEntry(item) {
       this.searchDate2 = item.date
@@ -1964,8 +1957,11 @@ export default {
     this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
       if (user) {
         this.user = user
-        this.refreshAll()
-        this.loadUserProfile()
+        // Check subscription FIRST, then load data regardless so they can preview
+        this.checkSubscription().then(() => {
+          this.refreshAll()
+          this.loadUserProfile()
+        })
       } else {
         this.$router.push('/login')
       }
@@ -1983,88 +1979,36 @@ export default {
 
 <style scoped>
 /* Base Utilities */
-.cursor-pointer {
-  cursor: pointer;
-}
-
-.bg-grey-lighten-4 {
-  background-color: #f5f5f5 !important;
-}
-
-.rounded-xl {
-  border-radius: 16px !important;
-}
-
-.h-100 {
-  height: 100%;
-}
-
-.tracking-wide {
-  letter-spacing: 0.08em;
-}
+.cursor-pointer { cursor: pointer; }
+.bg-grey-lighten-4 { background-color: #f5f5f5 !important; }
+.rounded-xl { border-radius: 16px !important; }
+.h-100 { height: 100%; }
+.tracking-wide { letter-spacing: 0.08em; }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
 /* Animations */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes pulse-soft {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 12px rgba(211, 47, 47, 0);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4); }
+  50% { box-shadow: 0 0 0 12px rgba(211, 47, 47, 0); }
 }
-
-.reveal-card {
-  animation: fadeInUp 0.6s ease-out both;
-}
+.reveal-card { animation: fadeInUp 0.6s ease-out both; }
 
 /* Sidebar */
-.sidebar-modern {
-  border-right: 1px solid #f0f0f0 !important;
-}
-
-.nav-item-modern {
-  transition: all 0.25s ease;
-  margin-bottom: 4px;
-}
-
-.nav-item-modern:hover {
-  background-color: #fafafa;
-  transform: translateX(4px);
-}
+.sidebar-modern { border-right: 1px solid #f0f0f0 !important; }
+.nav-item-modern { transition: all 0.25s ease; margin-bottom: 4px; }
+.nav-item-modern:hover { background-color: #fafafa; transform: translateX(4px); }
 
 /* Main & Header */
-.main-modern {
-  scroll-behavior: smooth;
-}
-
+.main-modern { scroll-behavior: smooth; }
 .sticky-header {
   position: sticky;
   top: 0;
@@ -2074,54 +2018,38 @@ export default {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
-  /* Prevent ghosting/black bars during scroll */
   backface-visibility: hidden;
   transform: translateZ(0);
 }
-
 @media (max-width: 599px) {
   .sticky-header {
-    /* Backdrop filter is extremely expensive on mobile GPUs and causes scroll lag/black screens */
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: #f5f5f5 !important;
     border-bottom: 1px solid #eeeeee;
   }
 }
-
 .sticky-header.scrolled {
   background: rgba(255, 255, 255, 0.95);
   border-bottom-color: #f0f0f0;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
 }
-
-.user-btn-modern {
-  transition: all 0.25s ease;
-}
-
-.user-btn-modern:hover {
-  background: #fafafa;
-}
+.user-btn-modern { transition: all 0.25s ease; }
+.user-btn-modern:hover { background: #fafafa; }
 
 /* KPI Cards */
 .kpi-card-modern {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid #f5f5f5;
 }
-
 .kpi-card-modern:hover {
   transform: translateY(-4px);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08) !important;
   border-color: #eeeeee;
 }
+.kpi-avatar { transition: all 0.3s ease; }
+.kpi-card-modern:hover .kpi-avatar { transform: scale(1.05); }
 
-.kpi-avatar {
-  transition: all 0.3s ease;
-}
-
-.kpi-card-modern:hover .kpi-avatar {
-  transform: scale(1.05);
-}
 
 /* Action Card */
 .action-card-modern {

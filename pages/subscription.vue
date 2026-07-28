@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="d-flex bg-grey-lighten-4" style="min-height: 100vh;">
     <!-- Desktop Sidebar -->
     <v-navigation-drawer v-if="!nav_bars" permanent width="260" class="elevation-1" color="white">
@@ -71,7 +71,8 @@
                 <v-btn v-if="!currentSub.is_active" color="white" class="red--text rounded-xl font-weight-bold px-6" @click="scrollToPlans">
                   <v-icon left>mdi-refresh</v-icon> Renew
                 </v-btn>
-                <v-btn v-else-if="currentSub.subscription.plan === 'pro'" text color="white" class="rounded-xl text-capitalize" @click="cancelDialog = true">
+                <!-- ONLY CHANGE: uses isPaidPlan instead of hardcoded 'pro' -->
+                <v-btn v-else-if="isPaidPlan(currentSub.subscription)" text color="white" class="rounded-xl text-capitalize" @click="cancelDialog = true">
                   Cancel
                 </v-btn>
               </div>
@@ -279,7 +280,7 @@
     </v-dialog>
 
     <!-- Snackbar -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="4000" bottom rounded="lg" class="mb-4">
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="5000" bottom rounded="lg" class="mb-4">
       <div class="d-flex align-center">
         <v-icon left small>{{ snackbar.color === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
         {{ snackbar.text }}
@@ -316,7 +317,7 @@ export default {
       paymentDialog: false,
       cancelDialog: false,
       selectedPlan: null,
-      mpesaPhone: '2547',
+      mpesaPhone: '254',
       payLoading: false,
       cancelLoading: false,
       
@@ -363,7 +364,7 @@ export default {
           }, 1000);
         } else if (value === 0 && this.timerEnabled) {
           this.StkQuery();
-          this.timerCount = 25;
+          
         }
       },
       immediate: true,
@@ -379,7 +380,8 @@ export default {
   methods: {
     async StkQuery() {
       if (!this.CheckoutRequestID) return;
-
+      this.timerCount = 25;
+      this.timerEnabled = false;
      
       this.showSnackbar('Checking payment status...', 'success');
 
@@ -387,23 +389,66 @@ export default {
         const response = await apiClient.post(`/subscriptions/query`, {
           checkout_request_id: this.CheckoutRequestID,
         });
-
-        this.timerCount = 25;
-        this.timerEnabled = false;
-        console.log("StkQuery response:", response.data);
+        const mpesaStatus = response.data.mpesa_status;
+        const details = response.data || {};
+        const resultCode = response.data.result_code;
+        const resultDesc = response.data.result_desc ;
+        
+       
 
         // this.showSuccess(response.data.ResultDesc || "Payment status received.");
-        if (
-          response.data.result_code === "0" ||
-          response.data.result_code === 0
-        ) {
+        if (response.data.result_code === "0") {
           this.paymentDialog = false;
           this.message = null;
          this.showSnackbar('Payment successful! Pro features activated.', 'success');
-         
-        }else {
-          this.showSnackbar(response.data.result_desc, 'warning');
+          return;
         }
+
+        // CANCELLED by user
+        if (resultCode === "1032") {
+
+          this.showSnackbar("You cancelled the payment on your phone. No money was deducted.",  "warning");
+          this.paymentDialog = false;
+          return;
+        }
+
+        // WRONG PIN
+        if (resultCode === "2001") {
+          this.showSnackbar("You entered the wrong M-Pesa PIN. Please try again.", "warning");
+          this.paymentDialog = false;
+          return;
+        }
+
+        // INSUFFICIENT BALANCE
+        if ( resultCode === "1") {
+          this.showSnackbar( "Your M-Pesa balance is too low for this transaction.", "warning");
+        
+          this.paymentDialog = false;
+          return;
+        }
+
+        // INVALID NUMBER
+        if (resultCode === "1001") {
+          this.showSnackbar("The phone number format is incorrect.", "warning");
+          this.paymentDialog = false;
+          return;
+        }
+
+        // TIMEOUT
+        if ( resultCode === "1002") {
+          this.showSnackbar("The M-Pesa request timed out. Please check if you received the prompt and try again.", "warning");
+          this.paymentDialog = false;
+          return;
+        }
+
+        // FAILED
+        if (mpesaStatus === "failed") {
+          this.showSnackbar( resultDesc || "The payment could not be completed. Please try again.", "warning");
+          this.paymentDialog = false;
+          return;
+        }
+ console.log("StkQuery response:", response.data);
+
       } catch (error) {
         console.error("StkQuery error:", error);
         this.timerCount = 25;
@@ -458,7 +503,7 @@ export default {
     
     openPayment(plan) {
       this.selectedPlan = plan;
-      this.mpesaPhone = '2547';
+      this.mpesaPhone = '254';
       this.paymentDialog = true;
     },
     
@@ -480,22 +525,12 @@ export default {
           this.timerEnabled = true;
         
         console.log('Payment initiated:', data);
-        if (this.demoMode) {
-          setTimeout(async () => {
-            await apiClient.post('/subscriptions/confirm', {
-              subscription_id: data.subscription_id,
-              firebase_uid: this.firebaseUid
-            });
-            // this.showSnackbar('Payment successful! Pro features activated.', 'success');
-            // this.paymentDialog = false;
-            await Promise.all([this.loadStatus(), this.loadPayments()]);
-            this.payLoading = false;
-          }, 2000);
-        } else {
+
           this.showSnackbar(data.message, 'success');
-          this.paymentDialog = false;
+          // this.paymentDialog = false;
           this.payLoading = false;
-        }
+
+        
       } catch (error) {
         this.showSnackbar(error.response?.data?.message || 'Payment failed', 'error');
         this.payLoading = false;
@@ -514,6 +549,15 @@ export default {
       } finally {
         this.cancelLoading = false;
       }
+    },
+    
+    // ONLY ADDITION: determines if a plan is paid (shows cancel button)
+    isPaidPlan(sub) {
+      if (!sub) return false;
+      const price = parseFloat(sub.price_kes);
+      if (!isNaN(price) && price > 0) return true;
+      const name = (sub.plan || sub.plan_name || '').toLowerCase();
+      return !['starter', 'free', 'basic'].includes(name);
     },
     
     showSnackbar(text, color = 'success') {
