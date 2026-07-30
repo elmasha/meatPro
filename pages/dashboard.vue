@@ -50,6 +50,19 @@
       <template v-slot:append>
         <div class="pa-4 pb-6">
           <!-- Setup Branches button for Pro users -->
+          <v-slide-y-transition>
+            <v-btn
+              v-if="proStatus === true"
+              block
+              color="red darken-2"
+              dark
+              class="rounded-xl text-capitalize font-weight-bold mb-3"
+              to="/setupbranch"
+            >
+              <v-icon left small>mdi-store-plus</v-icon>
+              Setup Branches
+            </v-btn>
+          </v-slide-y-transition>
             
 
           <v-card class="rounded-xl pa-3 red lighten-5" elevation="0">
@@ -105,19 +118,18 @@
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
                     <span class="text-caption grey--text text--darken-1">{{ shopName }} </span>
                   </div>
-                  <div v-if="proStatus === true">
-                    <v-col cols="12" sm="8" class="pa-0 mt-10" >
-                      <v-autocomplete
-                        v-show="proStatus"
-                        clearable
-                        @change="SelectionChange(selectedBranch)"
-                        v-model="selectedBranch"
-                        :items="branches.map(branch => branch.name)"
-                        dense
-                        filled
-                        label="Select Branch"
-                      ></v-autocomplete>
-                    </v-col>
+                  <div v-if="proStatus === true && branches.length > 1" class="mt-8" style="max-width: 220px;">
+                    <v-autocomplete
+                      v-model="selectedBranch"
+                      :items="branches.map(branch => branch.name)"
+                      @change="SelectionChange(selectedBranch)"
+                      clearable
+                      dense
+                      filled
+                      label="Select Branch"
+                      hide-details
+                      class="rounded-lg"
+                    ></v-autocomplete>
                   </div>
                 </div>
               </div>

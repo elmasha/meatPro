@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="d-flex bg-grey-lighten-4 dashboard-root" style="min-height: 100vh;">
     <!-- Desktop Sidebar -->
     <v-navigation-drawer
@@ -401,8 +401,87 @@
           </v-col>
         </v-row>
 
+        <!-- Subscription Status -->
+        <v-row class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 450ms">
+          <v-col cols="12">
+            <v-card class="rounded-xl pa-5 pa-sm-6 d-flex align-center justify-space-between flex-wrap" 
+              :class="statusCardClass" elevation="3">
+              <div class="d-flex align-center">
+                <v-avatar :color="currentSub?.is_active ? 'white' : 'orange'" size="56" class="mr-4 elevation-2">
+                  <v-icon :color="currentSub?.is_active ? 'green' : 'white'" size="28">
+                    {{ currentSub?.is_active ? 'mdi-crown' : 'mdi-alert' }}
+                  </v-icon>
+                </v-avatar>
+                <div>
+                  <div class="text-h6 font-weight-bold white--text">
+                    {{ currentSub?.subscription?.display_name || 'Starter' }}
+                  </div>
+                  <div class="text-caption white--text" style="opacity: 0.9;">
+                    <span v-if="currentSub?.is_active">
+                      Active until {{ formatDate(currentSub.subscription.end_date) }}
+                      <v-chip x-small color="white" class="ml-2" 
+                        :text-color="currentSub.days_remaining < 7 ? 'red' : 'green'">
+                        {{ currentSub.days_remaining }} days left
+                      </v-chip>
+                    </span>
+                    <span v-else-if="currentSub?.subscription?.status === 'cancelled'">
+                      Cancelled — expires {{ formatDate(currentSub.subscription.end_date) }}
+                    </span>
+                    <span v-else>Your subscription has expired. Renew to unlock Pro features.</span>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3 mt-sm-0">
+                <v-btn color="white" class="red--text rounded-xl font-weight-bold px-5" to="/subscription">
+                  <v-icon left small>mdi-crown</v-icon> Manage
+                </v-btn>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <!-- Payment History -->
+        <v-row class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 500ms">
+          <v-col cols="12">
+            <v-card class="rounded-xl" elevation="1">
+              <v-card-title class="px-4 px-sm-6 py-4 card-header-modern">
+                <div class="d-flex align-center">
+                  <v-avatar color="green lighten-5" size="36" class="mr-3">
+                    <v-icon color="green">mdi-receipt-text</v-icon>
+                  </v-avatar>
+                  <div>
+                    <div class="text-h6 font-weight-bold grey--text text--darken-2">Payment History</div>
+                    <div class="text-caption grey--text">Recent M-Pesa transactions</div>
+                  </div>
+                </div>
+              </v-card-title>
+              <v-divider />
+              <v-data-table :headers="paymentHeaders" :items="payments" dense 
+                class="rounded-b-xl entries-table-modern" mobile-breakpoint="600">
+                <template v-slot:item.amount="{ item }">
+                  <span class="font-weight-bold">KES {{ formatNumber(item.amount) }}</span>
+                </template>
+                <template v-slot:item.status="{ item }">
+                  <v-chip x-small :color="statusColor(item.status)" text-color="white" label>
+                    {{ item.status }}
+                  </v-chip>
+                </template>
+                <template v-slot:item.created_at="{ item }">
+                  {{ formatDate(item.created_at) }}
+                </template>
+                <template v-slot:no-data>
+                  <div class="text-center pa-6 grey--text">
+                    <v-icon size="40" color="grey lighten-2" class="mb-2">mdi-receipt-text-off</v-icon>
+                    <div>No payments yet</div>
+                  </div>
+                </template>
+              </v-data-table>
+            </v-card>
+          </v-col>
+        </v-row>
+
         <!-- Danger Zone -->
-        <v-row class="reveal-card" style="animation-delay: 500ms">
+        <v-row class="reveal-card" style="animation-delay: 550ms">
           <v-col cols="12">
             <v-card class="rounded-xl" elevation="1" color="red lighten-5">
               <v-card-title class="px-4 px-sm-6 py-4 red--text text--darken-2">
@@ -589,6 +668,17 @@ export default {
         daysActive: 0,
       },
 
+      // Subscription data
+      currentSub: null,
+      payments: [],
+      paymentHeaders: [
+        { text: 'Date', value: 'created_at' },
+        { text: 'Amount', value: 'amount', align: 'end' },
+        { text: 'Phone', value: 'phone' },
+        { text: 'Receipt', value: 'mpesa_receipt' },
+        
+      ],
+
       menuItems: [
         { title: 'Dashboard', icon: 'mdi-view-dashboard', to: '/dashboard' },
         { title: 'Reports', icon: 'mdi-chart-line', to: '/reports' },
@@ -612,6 +702,10 @@ export default {
     },
     userRole() {
       return 'Store Manager'
+    },
+    statusCardClass() {
+      if (!this.currentSub) return 'grey darken-2'
+      return this.currentSub.is_active ? 'gradient-active' : 'gradient-expired'
     },
     quickActions() {
       return [
@@ -637,11 +731,11 @@ export default {
           click: () => this.$router.push('/'),
         },
         {
-          title: 'Export Data',
-          subtitle: 'Download CSV',
-          icon: 'mdi-download',
+          title: 'Subscription',
+          subtitle: 'Manage billing',
+          icon: 'mdi-crown',
           color: 'purple darken-2',
-          click: () => this.$router.push('/reports'),
+          click: () => this.$router.push('/subscription'),
         },
       ]
     },
@@ -650,6 +744,22 @@ export default {
   methods: {
     formatNumber(val) {
       return numeral(val || 0).format('0,0')
+    },
+
+    formatDate(date) {
+      return date ? moment(date).format('MMM D, YYYY') : 'N/A'
+    },
+
+    statusColor(status) {
+      return { pending: 'orange', success: 'green', failed: 'red' }[status] || 'grey'
+    },
+
+    isPaidPlan(sub) {
+      if (!sub) return false
+      const price = parseFloat(sub.price_kes)
+      if (!isNaN(price) && price > 0) return true
+      const name = (sub.plan || sub.plan_name || '').toLowerCase()
+      return !['starter', 'free', 'basic'].includes(name)
     },
 
     async apiCall(method, endpoint, data = null) {
@@ -695,13 +805,33 @@ export default {
         }
       } catch (e) {
         console.error('Profile load error', e)
-        // Use defaults if API fails
         this.branch = {
           name: 'Prime Cuts - CBD',
           business_name: 'MeatPro Ltd',
           location: 'Nairobi CBD',
           phone: '+254 700 000000',
         }
+      }
+    },
+
+    async loadStatus() {
+      if (!this.user?.uid) return
+      try {
+        const { data } = await apiClient.get(`/subscriptions/status?firebase_uid=${this.user.uid}`)
+        this.currentSub = data
+      } catch (e) {
+        console.error('Status error', e)
+      }
+    },
+
+    async loadPayments() {
+      if (!this.user?.uid) return
+      try {
+        const { data } = await apiClient.get(`/subscriptions/history?firebase_uid=${this.user.uid}`)
+        this.payments = data || []
+      } catch (e) {
+        console.error('Payments error', e)
+        this.payments = []
       }
     },
 
@@ -743,6 +873,8 @@ export default {
       if (user) {
         this.user = user
         this.loadProfile()
+        this.loadStatus()
+        this.loadPayments()
       } else {
         this.$router.push('/login')
       }
@@ -841,14 +973,12 @@ export default {
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid transparent;
   transition: all 0.3s ease;
-  /* Prevent ghosting/black bars during scroll */
   backface-visibility: hidden;
   transform: translateZ(0);
 }
 
 @media (max-width: 599px) {
   .sticky-header {
-    /* Backdrop filter is extremely expensive on mobile GPUs and causes scroll lag/black screens */
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: #f5f5f5 !important;
@@ -942,6 +1072,24 @@ export default {
 
 .action-card-modern:hover .action-avatar {
   transform: scale(1.08) rotate(-3deg);
+}
+
+/* Subscription Gradients */
+.gradient-active {
+  background: linear-gradient(135deg, #2e7d32 0%, #43a047 50%, #66bb6a 100%);
+}
+
+.gradient-expired {
+  background: linear-gradient(135deg, #e65100 0%, #f57c00 50%, #ff9800 100%);
+}
+
+/* Tables */
+.entries-table-modern tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.entries-table-modern tbody tr:hover {
+  background-color: #fafafa;
 }
 
 /* Bottom Nav */
