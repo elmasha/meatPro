@@ -118,19 +118,7 @@
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
                     <span class="text-caption grey--text text--darken-1">{{ shopName }} </span>
                   </div>
-                  <div v-if="proStatus === true && branches.length > 1" class="mt-8" style="max-width: 220px;">
-                    <v-autocomplete
-                      v-model="selectedBranch"
-                      :items="branches.map(branch => branch.name)"
-                      @change="SelectionChange(selectedBranch)"
-                      clearable
-                      dense
-                      filled
-                      label="Select Branch"
-                      hide-details
-                      class="rounded-lg"
-                    ></v-autocomplete>
-                  </div>
+
                 </div>
               </div>
             </v-col>
@@ -277,6 +265,40 @@
           </v-alert>
         </v-slide-y-transition>
 
+        <!-- Branch Selector Bar -->
+        <v-row v-if="proStatus === true && branches.length > 1" dense class="mb-2 reveal-card">
+          <v-col cols="12">
+            <v-card class="rounded-xl pa-3 d-flex align-center" elevation="1" outlined>
+              <v-icon small color="grey darken-1" class="mr-3">mdi-store</v-icon>
+              <span class="text-caption grey--text text--darken-1 font-weight-medium mr-3 hidden-xs-only">Switch Branch</span>
+              <v-select
+                v-model="selectedBranch"
+                :items="branches.map(branch => branch.name)"
+                @change="SelectionChange(selectedBranch)"
+                dense
+                outlined
+                hide-details
+                rounded
+                placeholder="Select Branch"
+                class="rounded-lg branch-select-modern"
+                style="max-width: 260px;"
+              ></v-select>
+              <v-spacer />
+              <v-btn
+                v-if="proStatus === true"
+                small
+                text
+                color="red darken-2"
+                class="text-capitalize font-weight-medium rounded-lg"
+                to="/setupbranch"
+              >
+                <v-icon left x-small>mdi-store-plus</v-icon>
+                <span class="hidden-xs-only">Setup</span>
+              </v-btn>
+            </v-card>
+          </v-col>
+        </v-row>
+
         <!-- KPI Cards -->
         <v-row dense class="mb-4 mb-sm-6">
           <v-col
@@ -333,6 +355,47 @@
             </v-card>
           </v-col>
         </v-row>
+
+        <!-- Revenue Variance Alert -->
+        <v-slide-y-transition>
+          <v-row v-if="todayStats.revenueVariance && Math.abs(todayStats.revenueVariance) > 1 && todayStats.revenue > 0" class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 150ms">
+            <v-col cols="12">
+              <v-alert
+                :type="todayStats.revenueVariance > 0 ? 'warning' : 'error'"
+                dense
+                text
+                class="rounded-xl alert-modern"
+                border="left"
+                colored-border
+                elevation="2"
+              >
+                <div class="d-flex align-center flex-wrap">
+                  <v-avatar :color="todayStats.revenueVariance > 0 ? 'orange lighten-5' : 'red lighten-5'" size="40" class="mr-3 hidden-xs-only">
+                    <v-icon :color="todayStats.revenueVariance > 0 ? 'orange darken-2' : 'red darken-2'">
+                      {{ todayStats.revenueVariance > 0 ? 'mdi-alert' : 'mdi-alert-circle' }}
+                    </v-icon>
+                  </v-avatar>
+                  <div class="flex-grow-1">
+                    <div class="text-body-1 font-weight-bold grey--text text--darken-2">
+                      Revenue Variance: KES {{ formatNumber(Math.abs(todayStats.revenueVariance)) }}
+                    </div>
+                    <div class="text-body-2 grey--text text--darken-1">
+                      {{ todayStats.revenueVariance > 0 
+                        ? 'Expected revenue is higher than payments received. Check for unrecorded sales, theft, or pricing errors.' 
+                        : 'Payments received exceed expected revenue. Possible overpayment or data entry error.' }}
+                    </div>
+                  </div>
+                  <div class="text-right hidden-xs-only">
+                    <div class="text-caption grey--text">Expected</div>
+                    <div class="text-body-2 font-weight-bold">{{ formatNumber(todayStats.revenue) }}</div>
+                    <div class="text-caption grey--text mt-1">Received</div>
+                    <div class="text-body-2 font-weight-bold">{{ formatNumber(todayStats.actualRevenue) }}</div>
+                  </div>
+                </div>
+              </v-alert>
+            </v-col>
+          </v-row>
+        </v-slide-y-transition>
 
         <!-- Main Action: LOCKED if no subscription -->
         <v-row class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 200ms">
@@ -1066,25 +1129,54 @@
                     />
                   </v-col>
                 </v-row>
-                <v-card class="mt-4 pa-5 rounded-xl green lighten-5" elevation="0">
-                  <div class="d-flex justify-space-between align-center">
-                    <div>
-                      <div
-                        class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
-                      >
+                <!-- Expected vs Actual Revenue -->
+                <v-row dense class="mt-4">
+                  <v-col cols="6">
+                    <v-card class="pa-4 rounded-xl green lighten-5" elevation="0">
+                      <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
                         Expected Revenue
                       </div>
-                      <div class="text-h4 font-weight-bold green--text text--darken-2">
+                      <div class="text-h5 font-weight-bold green--text text--darken-2">
                         {{ formatNumber(expectedRevenue) }}
                       </div>
-                    </div>
-                    <div class="text-right">
-                      <div class="text-caption grey--text">
+                      <div class="text-caption grey--text mt-1">
                         {{ volumeSold }} kg × KES {{ form.selling_price_per_kg }}
                       </div>
-                    </div>
+                    </v-card>
+                  </v-col>
+                  <v-col cols="6">
+                    <v-card class="pa-4 rounded-xl purple lighten-5" elevation="0">
+                      <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
+                        Actual Revenue
+                      </div>
+                      <div class="text-h5 font-weight-bold purple--text text--darken-2">
+                        {{ formatNumber((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) }}
+                      </div>
+                      <div class="text-caption grey--text mt-1">
+                        Cash + M-Pesa payments
+                      </div>
+                    </v-card>
+                  </v-col>
+                </v-row>
+                <!-- Variance Alert -->
+                <v-alert
+                  v-if="Math.abs(expectedRevenue - ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0))) > 1"
+                  dense
+                  text
+                  :type="expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'warning' : 'error'"
+                  class="mt-4 rounded-xl"
+                  border="left"
+                  colored-border
+                >
+                  <div class="d-flex justify-space-between align-center">
+                    <span class="font-weight-medium">
+                      Variance: KES {{ formatNumber(Math.abs(expectedRevenue - ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)))) }}
+                    </span>
+                    <span class="text-caption grey--text">
+                      {{ expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'Expected > Received' : 'Received > Expected' }}
+                    </span>
                   </div>
-                </v-card>
+                </v-alert>
               </v-tab-item>
 
               <!-- EXPENSES -->
@@ -1219,17 +1311,27 @@
               </v-chip>
             </div>
             <v-row dense class="text-center">
-              <v-col cols="4">
+              <v-col cols="3">
                 <div
                   class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
                 >
-                  Revenue
+                  Expected Revenue
                 </div>
                 <div class="text-h6 text-sm-h5 font-weight-bold grey--text text--darken-3">
                   {{ formatNumber(expectedRevenue) }}
                 </div>
               </v-col>
-              <v-col cols="4">
+              <v-col cols="3">
+                <div
+                  class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
+                >
+                  Actual Revenue
+                </div>
+                <div class="text-h6 text-sm-h5 font-weight-bold purple--text text--darken-2">
+                  {{ formatNumber((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) }}
+                </div>
+              </v-col>
+              <v-col cols="3">
                 <div
                   class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
                 >
@@ -1239,7 +1341,7 @@
                   {{ formatNumber(expectedCost) }}
                 </div>
               </v-col>
-              <v-col cols="4">
+              <v-col cols="3">
                 <div
                   class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
                 >
@@ -1394,7 +1496,7 @@ export default {
       subActive: false,
       subData: null,
       userProfile: null,
-      // ── Existing Data ───────────────────────────────────────────    userProfile: null,
+      // ── Existing Data ───────────────────────────────────────────
 
       proStatus: false,
       branches: [],
@@ -1538,15 +1640,28 @@ export default {
       return this.recentEntries.filter((e) => e.date.includes(this.searchQuery))
     },
     kpiCards() {
+      const totalPayments = (this.todayStats.mpesa || 0) + (this.todayStats.cash || 0)
+      const expectedRevenue = this.todayStats.revenue || 0
+      const actualRevenue = this.todayStats.actualRevenue || totalPayments
+      const revenueVariance = this.todayStats.revenueVariance || (expectedRevenue - actualRevenue)
+      const hasVariance = Math.abs(revenueVariance) > 1 && expectedRevenue > 0
+
+      // Calculate real trend vs weekly average (using actual revenue)
+      let trendPct = 0
+      if (this.stats.week.revenue > 0 && (this.stats.last.actualRevenue || this.stats.last.revenue) > 0) {
+        const dailyAvg = this.stats.week.revenue / 7
+        trendPct = Math.round((((this.stats.last.actualRevenue || this.stats.last.revenue) - dailyAvg) / dailyAvg) * 100)
+      }
+
       return [
         {
-          label: "Today's Revenue",
-          value: this.formatNumber(this.todayStats.revenue),
-          subtitle: this.weekTrend.revenue >= 0 ? 'Above weekly avg' : 'Below weekly avg',
-          icon: 'mdi-cash-multiple',
+          label: 'Expected Revenue',
+          value: this.formatNumber(expectedRevenue),
+          subtitle: 'Based on stock sold × price',
+          icon: 'mdi-calculator-variant',
           iconBg: 'green lighten-5',
-          iconColor: 'green',
-          trend: this.weekTrend.revenue >= 0 ? 12 : -8,
+          iconColor: 'green darken-2',
+          trend: trendPct,
           bgClass: 'white',
           labelColor: 'grey--text',
           valueColor: 'grey--text text--darken-3',
@@ -1554,35 +1669,37 @@ export default {
         {
           label: 'Net Profit',
           value: this.formatNumber(this.todayStats.profit),
-          subtitle: `${this.todayStats.marginPct}% margin`,
-          icon: 'mdi-trending-up',
+          subtitle: `${this.todayStats.marginPct}% margin (actual)`,
+          icon: 'mdi-cash-multiple',
           iconBg: this.todayStats.profit >= 0 ? 'green lighten-5' : 'red lighten-5',
-          iconColor: this.todayStats.profit >= 0 ? 'green' : 'red',
+          iconColor: this.todayStats.profit >= 0 ? 'green darken-2' : 'red',
           bgClass: 'white',
           labelColor: 'grey--text',
-          valueColor: this.todayStats.profit >= 0 ? 'green--text' : 'red--text',
+          valueColor: this.todayStats.profit >= 0 ? 'green--text text--darken-2' : 'red--text',
+        },
+        {
+          label: 'Payments Received',
+          value: this.formatNumber(actualRevenue),
+          subtitle: hasVariance
+            ? `⚠ Variance: ${this.formatNumber(Math.abs(revenueVariance))}`
+            : `${this.formatNumber(this.todayStats.mpesa)} M-Pesa · ${this.formatNumber(this.todayStats.cash)} cash`,
+          icon: 'mdi-wallet',
+          iconBg: hasVariance ? 'orange lighten-5' : 'purple lighten-5',
+          iconColor: hasVariance ? 'orange darken-2' : 'purple darken-2',
+          bgClass: 'white',
+          labelColor: 'grey--text',
+          valueColor: hasVariance ? 'orange--text text--darken-2' : 'grey--text text--darken-3',
         },
         {
           label: 'Waste',
           value: `${this.todayStats.wasteKg}kg`,
-          subtitle: this.wasteAlert ? 'Check refrigeration' : 'Within normal',
+          subtitle: this.wasteAlert ? 'Above 5% — check storage' : 'Within normal range',
           icon: 'mdi-delete-variant',
           iconBg: this.wasteAlert ? 'red lighten-5' : 'blue lighten-5',
-          iconColor: this.wasteAlert ? 'red' : 'blue',
+          iconColor: this.wasteAlert ? 'red' : 'blue darken-2',
           bgClass: 'white',
           labelColor: 'grey--text',
           valueColor: this.wasteAlert ? 'red--text' : 'grey--text text--darken-3',
-        },
-        {
-          label: 'M-Pesa / Cash',
-          value: this.formatNumber(this.todayStats.mpesa),
-          subtitle: `/ ${this.formatNumber(this.todayStats.cash)} cash`,
-          icon: 'mdi-wallet',
-          iconBg: 'purple lighten-5',
-          iconColor: 'purple',
-          bgClass: 'white',
-          labelColor: 'grey--text',
-          valueColor: 'grey--text text--darken-3',
         },
       ]
     },
@@ -1592,7 +1709,7 @@ export default {
           label: 'Yesterday',
           icon: 'mdi-calendar-today',
           iconColor: 'grey',
-          revenue: this.stats.last.revenue,
+          revenue: this.stats.last.actualRevenue || this.stats.last.revenue,
           cost: this.stats.last.cost,
           margin: this.stats.last.margin,
         },
@@ -1600,7 +1717,7 @@ export default {
           label: 'Last 7 Days',
           icon: 'mdi-calendar-week',
           iconColor: 'blue',
-          revenue: this.stats.week.revenue,
+          revenue: this.stats.week.actualRevenue || this.stats.week.revenue,
           cost: this.stats.week.cost,
           margin: this.stats.week.margin,
         },
@@ -1608,16 +1725,19 @@ export default {
           label: 'This Month',
           icon: 'mdi-calendar-month',
           iconColor: 'red',
-          revenue: this.stats.month.revenue,
+          revenue: this.stats.month.actualRevenue || this.stats.month.revenue,
           cost: this.stats.month.cost,
           margin: this.stats.month.margin,
         },
       ]
     },
     confirmRows() {
+      const actualRevenue = (parseFloat(this.form.payment_cash) || 0) + (parseFloat(this.form.payment_mpesa) || 0)
+      const revenueVariance = this.expectedRevenue - actualRevenue
       return [
         { label: 'Volume Sold', value: `${this.volumeSold} kg`, class: 'grey--text text--darken-2' },
-        { label: 'Revenue', value: this.formatNumber(this.expectedRevenue), class: 'grey--text text--darken-2' },
+        { label: 'Expected Revenue', value: this.formatNumber(this.expectedRevenue), class: 'grey--text text--darken-2' },
+        { label: 'Actual Revenue', value: this.formatNumber(actualRevenue), class: 'grey--text text--darken-2' },
         { label: 'Cost of Goods', value: this.formatNumber(this.expectedCost), class: 'grey--text text--darken-2' },
         { label: 'Expenses', value: this.formatNumber(this.todayExpenseTotal), class: 'grey--text text--darken-2' },
         {
@@ -1757,22 +1877,30 @@ export default {
           this.apiCall('get', `/reports/last-7-days?branch_id=${this.branchId}`),
           this.apiCall('get', `/reports/month-to-date?branch_id=${this.branchId}`),
         ])
+        // last-entry now returns expectedRevenue, actualRevenue, actualMargin, etc.
         this.stats.last = {
-          revenue: parseFloat(last.totalRevenue) || 0,
+          revenue: parseFloat(last.expectedRevenue) || parseFloat(last.totalRevenue) || 0,
+          actualRevenue: parseFloat(last.actualRevenue) || parseFloat(last.totalRevenue) || 0,
           cost: parseFloat(last.totalCost) || 0,
-          margin: parseFloat(last.netMargin) || 0,
+          margin: parseFloat(last.actualMargin) || parseFloat(last.netMargin) || 0,
+          expectedMargin: parseFloat(last.expectedMargin) || 0,
+          revenueVariance: parseFloat(last.revenueVariance) || 0,
+          paymentCash: parseFloat(last.paymentCash) || 0,
+          paymentMpesa: parseFloat(last.paymentMpesa) || 0,
         }
         this.stats.week = {
           revenue: week.totalRevenue || 0,
+          actualRevenue: week.totalActualRevenue || week.totalRevenue || 0,
           cost: week.totalCost || 0,
           margin: week.totalProfit || 0,
         }
         this.stats.month = {
           revenue: month.totalRevenue || 0,
+          actualRevenue: month.totalActualRevenue || month.totalRevenue || 0,
           cost: month.totalCost || 0,
           margin: month.totalProfit || 0,
         }
-        this.weekTrend.revenue = this.stats.last.revenue - this.stats.week.revenue / 7
+        this.weekTrend.revenue = (this.stats.last.actualRevenue || this.stats.last.revenue) - this.stats.week.revenue / 7
       } catch (e) {
         console.error('Stats error', e)
       }
@@ -1797,18 +1925,49 @@ export default {
       try {
         const entry = await this.apiCall('get', `/daily-operations/last?branch_id=${this.branchId}`)
         console.log('Last entry', entry)
+
         if (entry) {
           this.lastClosingStock = entry.closing_stock_kg
           if (!this.form.opening_stock_kg && this.isToday && !this.isEditing) {
             this.form.opening_stock_kg = entry.closing_stock_kg
           }
+
+          // Fetch actual expenses for this date from the expenses table
+          let totalExpenses = 0
+          try {
+            const expenseData = await this.apiCall('get', `/expenses/${entry.date}?branch_id=${this.branchId}`)
+            totalExpenses = expenseData?.totalPaid || 0
+            this.todayExpenses = expenseData?.expenses || []
+          } catch (expError) {
+            console.log('No expenses found for this date')
+            this.todayExpenses = []
+          }
+
+          // ===== REVENUE BREAKDOWN =====
+          const expectedRevenue = parseFloat(entry.revenue) || 0           // Stock math: sold_kg × selling_price
+          const paymentCash = parseFloat(entry.payment_cash) || 0          // Actual cash collected
+          const paymentMpesa = parseFloat(entry.payment_mpesa) || 0        // Actual M-Pesa collected
+          const actualRevenue = paymentCash + paymentMpesa                // Total payments received
+          const cogs = (parseFloat(entry.sold_kg) || 0) * (parseFloat(entry.cost_per_kg) || 0)
+
+          // Real profit = actual payments − COGS − expenses
+          const actualProfit = actualRevenue - cogs - totalExpenses
+          // Expected profit = expected revenue − COGS − expenses
+          const expectedProfit = expectedRevenue - cogs - totalExpenses
+          const revenueVariance = expectedRevenue - actualRevenue
+
           this.todayStats = {
-            revenue: parseFloat(entry.revenue) || 0,
-            profit: parseFloat(entry.profit) || 0,
-            marginPct: entry.revenue ? ((entry.profit / entry.revenue) * 100).toFixed(1) : 0,
+            revenue: expectedRevenue,        // Expected (for COG reference)
+            actualRevenue: actualRevenue,     // Actual payments received
+            paymentCash: paymentCash,
+            paymentMpesa: paymentMpesa,
+            revenueVariance: revenueVariance,
+            profit: actualProfit,             // Real profit (actual − costs)
+            expectedProfit: expectedProfit,   // Theoretical profit
+            marginPct: actualRevenue ? ((actualProfit / actualRevenue) * 100).toFixed(1) : 0,
             wasteKg: parseFloat(entry.waste_kg) || 0,
-            mpesa: parseFloat(entry.payment_mpesa) || 0,
-            cash: parseFloat(entry.payment_cash) || 0,
+            mpesa: paymentMpesa,
+            cash: paymentCash,
           }
         }
       } catch (e) {
@@ -2229,6 +2388,15 @@ export default {
 /* Snackbar */
 .snackbar-modern ::v-deep .v-snackbar__content {
   padding: 12px 20px;
+}
+
+/* Branch Selector */
+.branch-select-modern ::v-deep .v-input__slot {
+  min-height: 36px !important;
+}
+.branch-select-modern ::v-deep .v-select__selections {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
 }
 
 /* Responsive */

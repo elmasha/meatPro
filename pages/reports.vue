@@ -1,4 +1,4 @@
-<<template>
+<template>
 <div class="d-flex bg-grey-lighten-4 dashboard-root" style="min-height: 100vh;">
     <!-- Desktop Sidebar -->
     <v-navigation-drawer v-if="!nav_bars" permanent width="280" class="elevation-2 sidebar-modern" color="white">
@@ -92,24 +92,23 @@
                                     <span class="text-caption grey--text text--darken-1">Last {{ periodDays }} days</span>
                                 </div>
                             </div>
-                            
-                            
+
+
                         </div>
-                        <div>
-                            <div v-if="proStatus === true">
-                    <v-col cols="12" sm="4" class="pa-0 mt-2" >
-                      <v-autocomplete
-                        clearable
-                        @change="SelectionChange(selectedBranch)"
+                        <div v-if="proStatus === true" class="mt-2">
+                      <v-select
                         v-model="selectedBranch"
                         :items="branches.map(branch => branch.name)"
+                        @change="SelectionChange(selectedBranch)"
                         dense
-                        filled
-                        label="Select Branch"
-                      ></v-autocomplete>
-                    </v-col>
+                        outlined
+                        hide-details
+                        rounded
+                        placeholder="Select Branch"
+                        class="rounded-lg branch-select-modern"
+                        style="max-width: 260px;"
+                      ></v-select>
                   </div>
-                        </div>
                     </v-col>
                     <v-col cols="4" sm="6" class="d-flex justify-end align-center">
                         <v-select v-model="periodDays" :items="periodOptions" item-text="label" item-value="value" dense outlined rounded hide-details class="rounded-lg mr-2 hidden-xs-only period-select-modern" style="max-width: 140px" @change="refreshAll" />
@@ -130,6 +129,35 @@
                             {{ opt.label }}
                         </v-chip>
                     </v-chip-group>
+                </v-col>
+            </v-row>
+
+            <!-- Revenue Variance Alert (shows when expected != actual) -->
+            <v-row v-if="revenueVariance !== 0" class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 50ms">
+                <v-col cols="12">
+                    <v-alert
+                        :type="revenueVariance > 0 ? 'warning' : 'info'"
+                        rounded="xl"
+                        class="mb-0"
+                        border="left"
+                        colored-border
+                        elevation="1"
+                    >
+                        <div class="d-flex align-center">
+                            <v-icon left :color="revenueVariance > 0 ? 'orange' : 'blue'">{{ revenueVariance > 0 ? 'mdi-alert-circle' : 'mdi-information' }}</v-icon>
+                            <div>
+                                <div class="font-weight-bold text-body-1">
+                                    {{ revenueVariance > 0 ? 'Revenue Shortfall Detected' : 'Revenue Surplus Detected' }}
+                                </div>
+                                <div class="text-body-2 mt-1">
+                                    Expected: <strong>{{ formatNumber(comparative.thisMonth.expectedRevenue) }}</strong> | 
+                                    Actual Received: <strong>{{ formatNumber(comparative.thisMonth.actualRevenue) }}</strong> | 
+                                    Variance: <strong :class="revenueVariance > 0 ? 'red--text' : 'green--text'">{{ formatNumber(Math.abs(revenueVariance)) }}</strong>
+                                    <span class="grey--text text--darken-1">({{ revenueVariance > 0 ? 'Missing money - check for theft/unrecorded sales' : 'Possible overpayment/data error' }})</span>
+                                </div>
+                            </div>
+                        </div>
+                    </v-alert>
                 </v-col>
             </v-row>
 
@@ -154,7 +182,11 @@
                         <div class="text-h5 text-sm-h4 font-weight-bold grey--text text--darken-3">
                             {{ card.value }}
                         </div>
-                        <div class="text-caption grey--text mt-1 font-weight-medium">vs last month</div>
+                        <!-- Show expected vs actual for revenue card -->
+                        <div v-if="card.showBreakdown && card.expectedValue" class="text-caption grey--text mt-1">
+                            Expected: {{ card.expectedValue }}
+                        </div>
+                        <div v-else class="text-caption grey--text mt-1 font-weight-medium">vs last month</div>
                     </v-card>
                 </v-col>
             </v-row>
@@ -172,7 +204,7 @@
                                     <div class="text-h6 font-weight-bold grey--text text--darken-2">
                                         Profit Trend
                                     </div>
-                                    <div class="text-caption grey--text">Daily profit/loss over time</div>
+                                    <div class="text-caption grey--text">Daily actual profit/loss (payments received)</div>
                                 </div>
                             </div>
                             <v-spacer />
@@ -224,7 +256,7 @@
                                     <div class="text-h6 font-weight-bold grey--text text--darken-2">
                                         Best Days
                                     </div>
-                                    <div class="text-caption grey--text">Performance by day of week</div>
+                                    <div class="text-caption grey--text">Performance by day of week (actual payments)</div>
                                 </div>
                             </div>
                         </v-card-title>
@@ -252,12 +284,12 @@
                                                 {{ day.day_name }}
                                             </td>
                                             <td class="text-right text-body-2 font-weight-medium py-3">
-                                                {{ formatNumber(day.avg_revenue) }}
+                                                {{ formatNumber(day.avg_actual_revenue || day.avg_revenue) }}
                                             </td>
                                             <td class="text-right py-3">
                                                 <v-chip x-small :color="
-                              day.avg_profit > 0 ? 'green lighten-5' : 'red lighten-5'
-                            " :text-color="day.avg_profit > 0 ? 'green' : 'red'" label class="font-weight-bold">
+                              day.avg_actual_profit > 0 || day.avg_profit > 0 ? 'green lighten-5' : 'red lighten-5'
+                            " :text-color="day.avg_actual_profit > 0 || day.avg_profit > 0 ? 'green' : 'red'" label class="font-weight-bold">
                                                     {{ dayMargin(day) }}%
                                                 </v-chip>
                                             </td>
@@ -433,7 +465,7 @@
                                             <td class="text-right text-body-2 font-weight-medium py-3">
                                                 {{
                             formatNumber(
-                              parseFloat(row.payment_mpesa) + parseFloat(row.payment_cash)
+                              parseFloat(row.payment_mpesa || 0) + parseFloat(row.payment_cash || 0)
                             )
                           }}
                                             </td>
@@ -580,24 +612,29 @@
                                 </div>
                             </template>
                             <template v-slot:item.revenue="{ item }">
-                                <span class="font-weight-medium text-body-2 grey--text text--darken-2">{{
-                    formatNumber(item.revenue)
+                                <div class="d-flex flex-column align-end">
+                                    <span class="font-weight-medium text-body-2 grey--text text--darken-2">{{
+                    formatNumber(item.actualRevenue || item.revenue)
                   }}</span>
+                                    <span v-if="item.expectedRevenue && item.expectedRevenue !== (item.actualRevenue || item.revenue)" class="text-caption grey--text">
+                                        Exp: {{ formatNumber(item.expectedRevenue) }}
+                                    </span>
+                                </div>
                             </template>
                             <template v-slot:item.profit="{ item }">
-                                <v-chip x-small :color="item.profit >= 0 ? 'green lighten-5' : 'red lighten-5'" :text-color="item.profit >= 0 ? 'green darken-2' : 'red darken-2'" label class="font-weight-bold">
-                                    {{ formatNumber(item.profit) }}
+                                <v-chip x-small :color="(item.actualProfit || item.profit) >= 0 ? 'green lighten-5' : 'red lighten-5'" :text-color="(item.actualProfit || item.profit) >= 0 ? 'green darken-2' : 'red darken-2'" label class="font-weight-bold">
+                                    {{ formatNumber(item.actualProfit || item.profit) }}
                                 </v-chip>
                             </template>
                             <template v-slot:item.margin_pct="{ item }">
                                 <span class="font-weight-bold text-body-2" :class="
-                      item.margin_pct >= 20
+                      (item.actualMarginPct || item.margin_pct) >= 20
                         ? 'green--text'
-                        : item.margin_pct >= 10
+                        : (item.actualMarginPct || item.margin_pct) >= 10
                         ? 'orange--text'
                         : 'red--text'
                     ">
-                                    {{ parseFloat(item.margin_pct || 0).toFixed(1) }}%
+                                    {{ parseFloat(item.actualMarginPct || item.margin_pct || 0).toFixed(1) }}%
                                 </span>
                             </template>
                             <template v-slot:item.waste_pct="{ item }">
@@ -757,12 +794,21 @@ export default {
                     profit: 0,
                     sold: 0,
                     avg_waste: 0,
+                    // New fields for actual vs expected
+                    actualRevenue: 0,
+                    expectedRevenue: 0,
+                    actualProfit: 0,
+                    expectedProfit: 0,
                 },
                 lastMonth: {
                     revenue: 0,
                     profit: 0,
                     sold: 0,
                     avg_waste: 0,
+                    actualRevenue: 0,
+                    expectedRevenue: 0,
+                    actualProfit: 0,
+                    expectedProfit: 0,
                 },
                 changes: {
                     revenue: 0,
@@ -865,9 +911,17 @@ export default {
 
     computed: {
         comparativeCards() {
+            // Use actual revenue/profit when available, fall back to legacy revenue/profit
+            const thisMonthActualRevenue = this.comparative.thisMonth.actualRevenue || this.comparative.thisMonth.revenue || 0
+            const thisMonthExpectedRevenue = this.comparative.thisMonth.expectedRevenue || this.comparative.thisMonth.revenue || 0
+            const thisMonthActualProfit = this.comparative.thisMonth.actualProfit || this.comparative.thisMonth.profit || 0
+            const thisMonthExpectedProfit = this.comparative.thisMonth.expectedProfit || this.comparative.thisMonth.profit || 0
+
             return [{
                     label: 'Revenue',
-                    value: this.formatNumber(this.comparative.thisMonth.revenue),
+                    value: this.formatNumber(thisMonthActualRevenue),
+                    expectedValue: thisMonthExpectedRevenue !== thisMonthActualRevenue ? this.formatNumber(thisMonthExpectedRevenue) : null,
+                    showBreakdown: true,
                     change: parseFloat(this.comparative.changes.revenue),
                     icon: 'mdi-cash-multiple',
                     bgColor: 'green lighten-5',
@@ -875,13 +929,13 @@ export default {
                 },
                 {
                     label: 'Net Profit',
-                    value: this.formatNumber(this.comparative.thisMonth.profit),
+                    value: this.formatNumber(thisMonthActualProfit),
                     change: parseFloat(this.comparative.changes.profit),
                     icon: 'mdi-trending-up',
-                    bgColor: this.comparative.thisMonth.profit >= 0 ?
+                    bgColor: thisMonthActualProfit >= 0 ?
                         'green lighten-5' :
                         'red lighten-5',
-                    iconColor: this.comparative.thisMonth.profit >= 0 ? 'green' : 'red',
+                    iconColor: thisMonthActualProfit >= 0 ? 'green' : 'red',
                 },
                 {
                     label: 'Volume Sold',
@@ -902,6 +956,13 @@ export default {
                     iconColor: 'red',
                 },
             ]
+        },
+
+        // Calculate revenue variance for alert
+        revenueVariance() {
+            const expected = this.comparative.thisMonth.expectedRevenue || this.comparative.thisMonth.revenue || 0
+            const actual = this.comparative.thisMonth.actualRevenue || this.comparative.thisMonth.revenue || 0
+            return expected - actual
         },
     },
 
@@ -968,9 +1029,9 @@ export default {
             return colors[index % colors.length]
         },
         dayMargin(day) {
-            return day.avg_revenue ?
-                ((day.avg_profit / day.avg_revenue) * 100).toFixed(1) :
-                0
+            const revenue = day.avg_actual_revenue || day.avg_revenue || 0
+            const profit = day.avg_actual_profit || day.avg_profit || 0
+            return revenue ? ((profit / revenue) * 100).toFixed(1) : 0
         },
         dateColor(date) {
             const day = moment(date).day()
@@ -1022,7 +1083,22 @@ export default {
                     'get',
                     `/reports/comparative?branch_id=${this.branchId}`
                 )
-                this.comparative = Object.freeze(data)
+
+                // Normalize data: ensure actualRevenue/actualProfit exist for new backend
+                // while maintaining backward compatibility with old backend
+                const normalizeMonth = (month) => ({
+                    ...month,
+                    actualRevenue: month.actualRevenue || month.revenue || 0,
+                    expectedRevenue: month.expectedRevenue || month.revenue || 0,
+                    actualProfit: month.actualProfit || month.profit || 0,
+                    expectedProfit: month.expectedProfit || month.profit || 0,
+                })
+
+                this.comparative = Object.freeze({
+                    ...data,
+                    thisMonth: normalizeMonth(data.thisMonth || {}),
+                    lastMonth: normalizeMonth(data.lastMonth || {}),
+                })
             } catch (e) {
                 console.error('Comparative error', e)
             }
@@ -1034,28 +1110,45 @@ export default {
                     'get',
                     `/reports/profitability?branch_id=${this.branchId}&days=${this.periodDays}`
                 )
-                this.dayOfWeek = Object.freeze(data.dayOfWeek || [])
 
-                const maxProfit = Math.max(
-                    ...data.daily.map((d) => Math.abs(parseFloat(d.profit) || 0)),
-                    1
-                )
-                this.profitTrend = Object.freeze(data.daily.map((d) => ({
-                    date: d.date,
-                    profit: parseFloat(d.profit) || 0,
-                    revenue: parseFloat(d.revenue) || 0,
-                    pct: ((Math.abs(parseFloat(d.profit) || 0) / maxProfit) * 80 + 5),
+                // Normalize dayOfWeek data
+                this.dayOfWeek = Object.freeze((data.dayOfWeek || []).map(day => ({
+                    ...day,
+                    avg_actual_revenue: day.avg_actual_revenue || day.avg_revenue || 0,
+                    avg_actual_profit: day.avg_actual_profit || day.avg_profit || 0,
                 })))
 
-                const totalMargin = data.daily.reduce(
-                    (s, d) => s + (parseFloat(d.margin_pct) || 0),
+                // Normalize daily data for profit trend and summary
+                const normalizedDaily = (data.daily || []).map(d => ({
+                    ...d,
+                    // Use actual values when available, fall back to legacy fields
+                    actualRevenue: d.actualRevenue || (parseFloat(d.payment_cash || 0) + parseFloat(d.payment_mpesa || 0)) || d.revenue || 0,
+                    expectedRevenue: d.expectedRevenue || d.revenue || 0,
+                    actualProfit: d.actualProfit || d.profit || 0,
+                    expectedProfit: d.expectedProfit || d.profit || 0,
+                    actualMarginPct: d.actualMarginPct || d.margin_pct || 0,
+                }))
+
+                const maxProfit = Math.max(
+                    ...normalizedDaily.map((d) => Math.abs(parseFloat(d.actualProfit) || 0)),
+                    1
+                )
+                this.profitTrend = Object.freeze(normalizedDaily.map((d) => ({
+                    date: d.date,
+                    profit: parseFloat(d.actualProfit) || 0,
+                    revenue: parseFloat(d.actualRevenue) || 0,
+                    pct: ((Math.abs(parseFloat(d.actualProfit) || 0) / maxProfit) * 80 + 5),
+                })))
+
+                const totalMargin = normalizedDaily.reduce(
+                    (s, d) => s + (parseFloat(d.actualMarginPct) || 0),
                     0
                 )
-                this.avgMargin = data.daily.length ?
-                    (totalMargin / data.daily.length).toFixed(1) :
+                this.avgMargin = normalizedDaily.length ?
+                    (totalMargin / normalizedDaily.length).toFixed(1) :
                     0
 
-                this.dailySummary = Object.freeze(data.daily.slice().reverse().map((d) => ({
+                this.dailySummary = Object.freeze(normalizedDaily.slice().reverse().map((d) => ({
                     ...d,
                     waste_pct: d.revenue ?
                         (parseFloat(d.waste_kg || 0) / parseFloat(d.sold_kg || 1)) * 100 :
@@ -1112,14 +1205,18 @@ export default {
         },
 
         exportCSV() {
-            const headers = ['Date', 'Revenue', 'Profit', 'Margin %', 'Sold kg', 'Waste %']
+            const headers = ['Date', 'Actual Revenue', 'Expected Revenue', 'Actual Profit', 'Expected Profit', 'Margin %', 'Sold kg', 'Waste %', 'Cash', 'M-Pesa']
             const rows = this.dailySummary.map((d) => [
                 d.date,
-                d.revenue,
-                d.profit,
-                d.margin_pct,
+                d.actualRevenue || d.revenue || 0,
+                d.expectedRevenue || d.revenue || 0,
+                d.actualProfit || d.profit || 0,
+                d.expectedProfit || d.profit || 0,
+                d.actualMarginPct || d.margin_pct || 0,
                 d.sold_kg,
                 d.waste_pct,
+                d.payment_cash || 0,
+                d.payment_mpesa || 0,
             ])
             const csv = [headers, ...rows].map((r) => r.join(',')).join('\n')
             const blob = new Blob([csv], {
@@ -1520,5 +1617,14 @@ export default {
 
 .cursor-pointer {
     cursor: pointer;
+}
+
+/* Branch Selector */
+.branch-select-modern ::v-deep .v-input__slot {
+  min-height: 36px !important;
+}
+.branch-select-modern ::v-deep .v-select__selections {
+  padding-top: 2px !important;
+  padding-bottom: 2px !important;
 }
 </style>
