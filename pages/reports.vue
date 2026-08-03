@@ -1,1630 +1,1729 @@
 <template>
-<div class="d-flex bg-grey-lighten-4 dashboard-root" style="min-height: 100vh;">
-    <!-- Desktop Sidebar -->
-    <v-navigation-drawer v-if="!nav_bars" permanent width="280" class="elevation-2 sidebar-modern" color="white">
-        <div class="pa-6 pb-4">
-            <div class="d-flex align-center cursor-pointer" @click="$router.push('/')">
-                <div class="logo-container mr-3">
-                    <v-avatar color="red darken-2" size="44">
-                        <v-icon color="white" size="22">mdi-food-steak</v-icon>
-                    </v-avatar>
-                </div>
-                <div>
-                    <div class="text-h6 font-weight-bold red--text text--darken-2">MeatPro</div>
-                    <div class="text-caption grey--text text--darken-1 text-truncate" style="max-width: 160px">
-                        {{ shopName || 'Analytics' }}
-                    </div>
-                </div>
+  <div class="reports-page">
+    <!-- Header -->
+    <div class="page-header">
+      <div class="header-left">
+        <button class="back-btn" @click="$router.push('/dashboard')">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <div>
+          <h1>Analytics & Reports</h1>
+          <p class="subtitle">
+            <i class="far fa-calendar-alt"></i>
+            {{ periodLabel }}
+          </p>
+        </div>
+      </div>
+      <div class="header-right">
+        <select v-model="selectedBranch" class="branch-select">
+          <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+        </select>
+        <select v-model="selectedPeriod" class="period-select">
+          <option value="7">7 Days</option>
+          <option value="30">30 Days</option>
+          <option value="90">90 Days</option>
+        </select>
+        <button class="refresh-btn" @click="loadAll" :class="{ spinning: loading }">
+          <i class="fas fa-sync-alt"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Period Tabs -->
+    <div class="period-tabs">
+      <button 
+        v-for="p in [{v:'7',l:'7 Days'},{v:'30',l:'30 Days'},{v:'90',l:'90 Days'}]" 
+        :key="p.v"
+        :class="['tab-btn', { active: selectedPeriod === p.v }]"
+        @click="selectedPeriod = p.v"
+      >
+        {{ p.l }}
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading reports...</p>
+    </div>
+
+    <template v-else>
+      <!-- ===== COMPARATIVE CARDS ===== -->
+      <div class="cards-grid">
+        <!-- Revenue Card -->
+        <div class="metric-card revenue">
+          <div class="card-header">
+            <div class="icon-wrap"><i class="fas fa-money-bill-wave"></i></div>
+            <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('actual_revenue')">
+              <i :class="getChangeIcon('actual_revenue')"></i>
+              {{ Math.abs(parseFloat(comparative.changes.actual_revenue) || 0) }}%
+            </span>
+            <span v-else class="change-badge neutral">—</span>
+          </div>
+          <div class="card-body">
+            <h3>Revenue</h3>
+            <div class="amount">{{ formatCurrency(comparative.thisMonth.actual_revenue) }}</div>
+            <p class="vs-text">vs last month</p>
+            <div v-if="hasRevenueVariance" class="sub-note">
+              Expected: {{ formatCurrency(comparative.thisMonth.expected_revenue) }}
             </div>
+          </div>
         </div>
 
-        <v-divider class="mx-4 mb-2" />
-
-        <v-list dense nav class="px-3 py-2">
-            <v-list-item v-for="(item, idx) in menuItems" :key="item.title" :to="item.to" link class="mb-1 rounded-xl nav-item-modern" active-class="red lighten-5 red--text text--darken-2" :style="{ 'animation-delay': idx * 50 + 'ms' }">
-                <v-list-item-icon class="mr-3">
-                    <v-icon color="grey darken-1">{{ item.icon }}</v-icon>
-                </v-list-item-icon>
-                <v-list-item-content>
-                    <v-list-item-title class="font-weight-medium text-body-2">{{
-              item.title
-            }}</v-list-item-title>
-                </v-list-item-content>
-            </v-list-item>
-        </v-list>
-
-        <template v-slot:append>
-            <div class="pa-4 pb-6">
-                <!-- Setup Branches button for Pro users -->
-                <v-slide-y-transition>
-                    <v-btn
-                        v-if="subData?.subscription?.tier === 'pro'"
-                        block
-                        color="red darken-2"
-                        dark
-                        class="rounded-xl text-capitalize font-weight-bold mb-3"
-                        to="/setupbranch"
-                    >
-                        <v-icon left small>mdi-store-plus</v-icon>
-                        Setup Branches
-                    </v-btn>
-                </v-slide-y-transition>
-
-                <v-card class="rounded-xl pa-3 red lighten-5" elevation="0">
-                    <div class="d-flex align-center mb-2">
-                        <v-icon color="red" small>mdi-headset</v-icon>
-                        <span class="text-caption font-weight-bold red--text ml-2">Need Help?</span>
-                    </div>
-                    <div class="text-caption grey--text text--darken-1 mb-2">
-                        WhatsApp support available
-                    </div>
-                    <v-btn block small text color="red" class="text-capitalize rounded-lg">
-                        Contact Us
-                    </v-btn>
-                </v-card>
-                <v-btn block outlined color="grey darken-1" class="rounded-xl text-capitalize mt-3" @click="logout">
-                    <v-icon left size="18">mdi-logout</v-icon> Sign Out
-                </v-btn>
+        <!-- Net Profit Card -->
+        <div class="metric-card profit">
+          <div class="card-header">
+            <div class="icon-wrap"><i class="fas fa-chart-line"></i></div>
+            <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('actual_profit')">
+              <i :class="getChangeIcon('actual_profit')"></i>
+              {{ Math.abs(parseFloat(comparative.changes.actual_profit) || 0) }}%
+            </span>
+            <span v-else class="change-badge neutral">—</span>
+          </div>
+          <div class="card-body">
+            <h3>Net Profit</h3>
+            <div class="amount" :class="getAmountClass(comparative.thisMonth.actual_profit)">
+              {{ formatCurrency(comparative.thisMonth.actual_profit) }}
             </div>
-        </template>
-    </v-navigation-drawer>
+            <p class="vs-text">vs last month</p>
+            <div v-if="hasProfitVariance" class="sub-note">
+              Expected: {{ formatCurrency(comparative.thisMonth.expected_profit) }}
+            </div>
+          </div>
+        </div>
 
-    <!-- Main Content -->
-    <v-main :class="nav_bars ? 'pb-16' : ''" class="main-modern">
-        <!-- Sticky Header -->
-        <div class="sticky-header px-4 px-sm-6 py-3">
-            <v-container fluid class="pa-0">
-                <v-row align="center" no-gutters>
-                    <v-col cols="8" sm="6">
-                        <div class="d-flex align-center">
-                            <v-btn v-if="nav_bars" icon small class="mr-2" @click="mobileDrawer = true">
-                                <v-icon>mdi-menu</v-icon>
-                            </v-btn>
-                            <v-btn v-else icon small class="mr-3" to="/dashboard">
-                                <v-icon>mdi-arrow-left</v-icon>
-                            </v-btn>
-                            <div>
-                                <h1 class="text-h6 text-sm-h5 font-weight-bold grey--text text--darken-3">
-                                    Analytics & Reports
-                                </h1>
-                                <div class="d-flex align-center mt-1">
-                                    <v-icon x-small color="grey" class="mr-1">mdi-calendar-range</v-icon>
-                                    <span class="text-caption grey--text text--darken-1">Last {{ periodDays }} days</span>
-                                </div>
-                            </div>
+        <!-- Volume Card -->
+        <div class="metric-card volume">
+          <div class="card-header">
+            <div class="icon-wrap"><i class="fas fa-weight-hanging"></i></div>
+            <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('sold')">
+              <i :class="getChangeIcon('sold')"></i>
+              {{ Math.abs(parseFloat(comparative.changes.sold) || 0) }}%
+            </span>
+            <span v-else class="change-badge neutral">—</span>
+          </div>
+          <div class="card-body">
+            <h3>Volume Sold</h3>
+            <div class="amount">{{ formatNumber(comparative.thisMonth.sold) }} kg</div>
+            <p class="vs-text">vs last month</p>
+          </div>
+        </div>
 
+        <!-- Waste Card -->
+        <div class="metric-card waste">
+          <div class="card-header">
+            <div class="icon-wrap"><i class="fas fa-trash-alt"></i></div>
+            <span v-if="hasComparativeData" class="change-badge" :class="getWasteChangeClass()">
+              <i :class="getWasteChangeIcon()"></i>
+              {{ Math.abs(parseFloat(comparative.changes.waste) || 0) }}%
+            </span>
+            <span v-else class="change-badge neutral">—</span>
+          </div>
+          <div class="card-body">
+            <h3>Waste Rate</h3>
+            <div class="amount">{{ formatNumber(comparative.thisMonth.avg_waste) }} kg/day</div>
+            <p class="vs-text">vs last month</p>
+          </div>
+        </div>
+      </div>
 
-                        </div>
-                        <div v-if="proStatus === true" class="mt-2">
-                      <v-select
-                        v-model="selectedBranch"
-                        :items="branches.map(branch => branch.name)"
-                        @change="SelectionChange(selectedBranch)"
-                        dense
-                        outlined
-                        hide-details
-                        rounded
-                        placeholder="Select Branch"
-                        class="rounded-lg branch-select-modern"
-                        style="max-width: 260px;"
-                      ></v-select>
+      <!-- ===== REVENUE VARIANCE ALERT ===== -->
+      <div v-if="showVarianceAlert" class="variance-alert" :class="revenueVariance > 0 ? 'warning' : 'info'">
+        <div class="alert-icon">
+          <i :class="revenueVariance > 0 ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle'"></i>
+        </div>
+        <div class="alert-content">
+          <h4>{{ revenueVariance > 0 ? 'Revenue Shortfall Detected' : 'Revenue Overcollection' }}</h4>
+          <p>
+            Expected: {{ formatCurrency(comparative.thisMonth.expected_revenue) }} 
+            | Actual: {{ formatCurrency(comparative.thisMonth.actual_revenue) }}
+            <strong>{{ revenueVariance > 0 ? 'Shortfall' : 'Excess' }}: {{ formatCurrency(Math.abs(revenueVariance)) }}</strong>
+          </p>
+        </div>
+      </div>
+
+      <!-- ===== CHARTS ROW ===== -->
+      <div class="charts-row">
+        <!-- Profit Trend -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <h3><i class="fas fa-chart-bar"></i> Profit Trend</h3>
+              <p class="chart-subtitle">Daily actual profit/loss (payments minus costs)</p>
+            </div>
+            <span class="chart-badge">Daily</span>
+          </div>
+          <div class="chart-body">
+            <div v-if="!hasProfitTrend" class="empty-state">
+              <i class="fas fa-chart-bar"></i>
+              <p>No data for selected period</p>
+            </div>
+            <div v-else class="bar-chart">
+              <div 
+                v-for="(item, i) in profitTrend" 
+                :key="i"
+                class="bar-item"
+                :class="(item.actual_profit || item.profit || 0) >= 0 ? 'profit' : 'loss'"
+              >
+                <div class="bar-label">{{ formatDateShort(item.date) }}</div>
+                <div class="bar-track">
+                  <div 
+                    class="bar-fill" 
+                    :style="{ height: getBarHeight(item) + '%' }"
+                  ></div>
+                </div>
+                <div class="bar-value" :class="(item.actual_profit || item.profit || 0) >= 0 ? 'positive' : 'negative'">
+                  {{ formatCurrencyCompact(item.actual_profit || item.profit) }}
+                </div>
+              </div>
+            </div>
+            <div v-if="hasProfitTrend" class="chart-legend">
+              <span><i class="dot profit"></i> Profit</span>
+              <span><i class="dot loss"></i> Loss</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Best Days -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <h3><i class="fas fa-calendar-check"></i> Best Days</h3>
+              <p class="chart-subtitle">Performance by day of week</p>
+            </div>
+          </div>
+          <div class="chart-body">
+            <div v-if="!hasDayOfWeek" class="empty-state">
+              <i class="fas fa-calendar"></i>
+              <p>No data available</p>
+            </div>
+            <div v-else class="best-days-list">
+              <div 
+                v-for="(day, i) in sortedDays" 
+                :key="i"
+                class="day-row"
+              >
+                <div class="day-info">
+                  <span class="day-dot" :style="{ background: dayColors[i % dayColors.length] }"></span>
+                  <span class="day-name">{{ day.day_name }}</span>
+                </div>
+                <div class="day-metrics">
+                  <div class="metric">
+                    <span class="metric-label">Avg Revenue</span>
+                    <span class="metric-value">{{ formatCurrency(day.avg_actual_revenue || day.avg_revenue || 0) }}</span>
                   </div>
-                    </v-col>
-                    <v-col cols="4" sm="6" class="d-flex justify-end align-center">
-                        <v-select v-model="periodDays" :items="periodOptions" item-text="label" item-value="value" dense outlined rounded hide-details class="rounded-lg mr-2 hidden-xs-only period-select-modern" style="max-width: 140px" @change="refreshAll" />
-                        <v-btn icon outlined small color="grey lighten-1" @click="refreshAll" :loading="loading">
-                            <v-icon small>mdi-refresh</v-icon>
-                        </v-btn>
-                    </v-col>
-                </v-row>
-            </v-container>
-        </div>
-
-        <v-container :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
-            <!-- Period Chips -->
-            <v-row class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 0ms">
-                <v-col cols="12">
-                    <v-chip-group v-model="periodDays" mandatory @change="refreshAll" active-class="red darken-2 white--text" class="period-chips-modern">
-                        <v-chip v-for="opt in periodOptions" :key="opt.value" :value="opt.value" filter class="font-weight-medium rounded-lg px-4" color="red lighten-4" text-color="black darken-2">
-                            {{ opt.label }}
-                        </v-chip>
-                    </v-chip-group>
-                </v-col>
-            </v-row>
-
-            <!-- Revenue Variance Alert (shows when expected != actual) -->
-            <v-row v-if="revenueVariance !== 0" class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 50ms">
-                <v-col cols="12">
-                    <v-alert
-                        :type="revenueVariance > 0 ? 'warning' : 'info'"
-                        rounded="xl"
-                        class="mb-0"
-                        border="left"
-                        colored-border
-                        elevation="1"
-                    >
-                        <div class="d-flex align-center">
-                            <v-icon left :color="revenueVariance > 0 ? 'orange' : 'blue'">{{ revenueVariance > 0 ? 'mdi-alert-circle' : 'mdi-information' }}</v-icon>
-                            <div>
-                                <div class="font-weight-bold text-body-1">
-                                    {{ revenueVariance > 0 ? 'Revenue Shortfall Detected' : 'Revenue Surplus Detected' }}
-                                </div>
-                                <div class="text-body-2 mt-1">
-                                    Expected: <strong>{{ formatNumber(comparative.thisMonth.expectedRevenue) }}</strong> | 
-                                    Actual Received: <strong>{{ formatNumber(comparative.thisMonth.actualRevenue) }}</strong> | 
-                                    Variance: <strong :class="revenueVariance > 0 ? 'red--text' : 'green--text'">{{ formatNumber(Math.abs(revenueVariance)) }}</strong>
-                                    <span class="grey--text text--darken-1">({{ revenueVariance > 0 ? 'Missing money - check for theft/unrecorded sales' : 'Possible overpayment/data error' }})</span>
-                                </div>
-                            </div>
-                        </div>
-                    </v-alert>
-                </v-col>
-            </v-row>
-
-            <!-- Comparative Cards -->
-            <v-row dense class="mb-4 mb-sm-6">
-                <v-col v-for="(card, i) in comparativeCards" :key="i" cols="6" lg="3" class="reveal-card" :style="{ 'animation-delay': i * 100 + 'ms' }">
-                    <v-card class="pa-4 pa-sm-5 rounded-xl h-100 kpi-card-modern" elevation="1">
-                        <div class="d-flex align-start justify-space-between mb-3">
-                            <v-avatar :color="card.bgColor" size="48" class="elevation-1 kpi-avatar">
-                                <v-icon :color="card.iconColor" size="24">{{ card.icon }}</v-icon>
-                            </v-avatar>
-                            <v-chip x-small :color="card.change >= 0 ? 'green lighten-5' : 'red lighten-5'" :text-color="card.change >= 0 ? 'green darken-2' : 'red darken-2'" label class="font-weight-bold">
-                                <v-icon x-small left>{{
-                    card.change >= 0 ? 'mdi-trending-up' : 'mdi-trending-down'
-                  }}</v-icon>
-                                {{ Math.abs(card.change) }}%
-                            </v-chip>
-                        </div>
-                        <div class="text-caption font-weight-bold text-uppercase grey--text mb-1 tracking-wide">
-                            {{ card.label }}
-                        </div>
-                        <div class="text-h5 text-sm-h4 font-weight-bold grey--text text--darken-3">
-                            {{ card.value }}
-                        </div>
-                        <!-- Show expected vs actual for revenue card -->
-                        <div v-if="card.showBreakdown && card.expectedValue" class="text-caption grey--text mt-1">
-                            Expected: {{ card.expectedValue }}
-                        </div>
-                        <div v-else class="text-caption grey--text mt-1 font-weight-medium">vs last month</div>
-                    </v-card>
-                </v-col>
-            </v-row>
-
-            <!-- Profit Trend + Best Days -->
-            <v-row class="mb-4 mb-sm-6">
-                <v-col cols="12" lg="8" class="reveal-card" style="animation-delay: 200ms">
-                    <v-card class="rounded-xl h-100" elevation="1">
-                        <v-card-title class="px-4 px-sm-6 py-4 card-header-modern">
-                            <div class="d-flex align-center">
-                                <v-avatar color="red lighten-5" size="36" class="mr-3">
-                                    <v-icon color="red">mdi-chart-line</v-icon>
-                                </v-avatar>
-                                <div>
-                                    <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                                        Profit Trend
-                                    </div>
-                                    <div class="text-caption grey--text">Daily actual profit/loss (payments received)</div>
-                                </div>
-                            </div>
-                            <v-spacer />
-                            <v-btn x-small text color="grey" class="text-capitalize font-weight-medium">Daily</v-btn>
-                        </v-card-title>
-                        <v-divider />
-                        <v-card-text class="pa-4 pa-sm-6">
-                            <div class="chart-container-modern">
-                                <div v-for="(day, i) in profitTrend" :key="i" class="chart-bar-wrapper-modern">
-                                    <div class="d-flex flex-column align-center w-100">
-                                        <div class="chart-bar-container-modern">
-                                            <div class="chart-bar-modern" :style="{
-                            height: `${Math.max(day.pct, 5)}%`,
-                            backgroundImage:
-                              day.profit >= 0
-                                ? 'linear-gradient(to top, #4caf50, #81c784)'
-                                : 'linear-gradient(to top, #f44336, #e57373)',
-                            backgroundColor: day.profit >= 0 ? '#4caf50' : '#f44336'
-                          }"></div>
-                                        </div>
-                                        <div class="chart-label-modern text-caption grey--text mt-2">
-                                            {{ formatDayShort(day.date) }}
-                                        </div>
-                                        <div class="chart-value-modern text-caption font-weight-medium" :class="day.profit >= 0 ? 'green--text' : 'red--text'">
-                                            {{ formatNumberShort(day.profit) }}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="d-flex justify-space-between mt-4 text-caption grey--text">
-                                <span>
-                                    <v-icon x-small color="green" class="mr-1">mdi-circle</v-icon> Profit |
-                                    <v-icon x-small color="red" class="mr-1">mdi-circle</v-icon> Loss
-                                </span>
-                                <span class="font-weight-medium">Avg Margin: {{ avgMargin }}%</span>
-                            </div>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
-
-                <v-col cols="12" lg="4" class="reveal-card" style="animation-delay: 300ms">
-                    <v-card class="rounded-xl h-100" elevation="1">
-                        <v-card-title class="px-4 px-sm-6 py-4 card-header-modern">
-                            <div class="d-flex align-center">
-                                <v-avatar color="orange lighten-5" size="36" class="mr-3">
-                                    <v-icon color="orange">mdi-calendar-week</v-icon>
-                                </v-avatar>
-                                <div>
-                                    <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                                        Best Days
-                                    </div>
-                                    <div class="text-caption grey--text">Performance by day of week (actual payments)</div>
-                                </div>
-                            </div>
-                        </v-card-title>
-                        <v-divider />
-                        <v-card-text class="pa-4 pa-sm-6">
-                            <v-simple-table dense class="best-days-table-modern">
-                                <template v-slot:default>
-                                    <thead>
-                                        <tr>
-                                            <th class="text-left text-caption grey--text font-weight-medium">
-                                                Day
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                Avg Revenue
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                Margin
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(day, i) in dayOfWeek" :key="i" class="row-modern">
-                                            <td class="text-body-2 py-3">
-                                                <v-icon x-small :color="dayColor(i)" class="mr-2">mdi-circle</v-icon>
-                                                {{ day.day_name }}
-                                            </td>
-                                            <td class="text-right text-body-2 font-weight-medium py-3">
-                                                {{ formatNumber(day.avg_actual_revenue || day.avg_revenue) }}
-                                            </td>
-                                            <td class="text-right py-3">
-                                                <v-chip x-small :color="
-                              day.avg_actual_profit > 0 || day.avg_profit > 0 ? 'green lighten-5' : 'red lighten-5'
-                            " :text-color="day.avg_actual_profit > 0 || day.avg_profit > 0 ? 'green' : 'red'" label class="font-weight-bold">
-                                                    {{ dayMargin(day) }}%
-                                                </v-chip>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </template>
-                            </v-simple-table>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
-            </v-row>
-
-            <!-- Waste & Payment -->
-            <v-row class="mb-4 mb-sm-6">
-                <!-- Waste Analysis -->
-                <v-col cols="12" lg="6" class="reveal-card" style="animation-delay: 400ms">
-                    <v-card class="rounded-xl h-100" elevation="1">
-                        <v-card-title class="px-4 px-sm-6 py-4 card-header-modern">
-                            <div class="d-flex align-center">
-                                <v-avatar color="red lighten-5" size="36" class="mr-3">
-                                    <v-icon color="red">mdi-delete-variant</v-icon>
-                                </v-avatar>
-                                <div>
-                                    <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                                        Waste Analysis
-                                    </div>
-                                    <div class="text-caption grey--text">Cost of spoilage & trimmings</div>
-                                </div>
-                            </div>
-                            <v-spacer />
-                            <v-chip small :color="wasteData.avgWastePct > 5 ? 'red lighten-5' : 'green lighten-5'" :text-color="wasteData.avgWastePct > 5 ? 'red' : 'green'" label class="font-weight-bold">
-                                {{ wasteData.avgWastePct }}% avg
-                            </v-chip>
-                        </v-card-title>
-                        <v-divider />
-                        <v-card-text class="pa-4 pa-sm-6">
-                            <div class="d-flex align-center mb-5">
-                                <div class="flex-grow-1 mr-4">
-                                    <div class="d-flex justify-space-between text-body-2 mb-2">
-                                        <span class="grey--text text--darken-1 font-weight-medium">Total Waste Cost</span>
-                                        <span class="font-weight-bold red--text text--darken-2">{{
-                        formatNumber(wasteData.totalWasteCost)
-                      }}</span>
-                                    </div>
-                                    <v-progress-linear :value="Math.min(wasteData.avgWastePct * 15, 100)" :color="wasteData.avgWastePct > 5 ? 'red' : 'green'" rounded height="10" class="rounded-lg progress-modern" background-color="grey lighten-3" />
-                                </div>
-                            </div>
-
-                            <v-simple-table dense class="waste-table-modern">
-                                <template v-slot:default>
-                                    <thead>
-                                        <tr>
-                                            <th class="text-left text-caption grey--text font-weight-medium">
-                                                Date
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                Waste (kg)
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                %
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                Cost
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(row, i) in wasteData.data.slice(0, 7)" :key="i" class="row-modern">
-                                            <td class="text-body-2 py-3">
-                                                {{ formatDateShort(row.date) }}
-                                            </td>
-                                            <td class="text-right text-body-2 py-3">
-                                                {{ row.waste_kg }} kg
-                                            </td>
-                                            <td class="text-right py-3">
-                                                <v-chip x-small :color="
-                              row.waste_pct > 5 ? 'red lighten-5' : 'grey lighten-4'
-                            " :text-color="row.waste_pct > 5 ? 'red' : 'grey'" label class="font-weight-bold">
-                                                    {{ parseFloat(row.waste_pct).toFixed(1) }}%
-                                                </v-chip>
-                                            </td>
-                                            <td class="text-right text-body-2 grey--text py-3">
-                                                {{ formatNumber(row.waste_cost) }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </template>
-                            </v-simple-table>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
-
-                <!-- Payment Mix -->
-                <v-col cols="12" lg="6" class="reveal-card" style="animation-delay: 500ms">
-                    <v-card class="rounded-xl h-100" elevation="1">
-                        <v-card-title class="px-4 px-sm-6 py-4 card-header-modern">
-                            <div class="d-flex align-center">
-                                <v-avatar color="blue lighten-5" size="36" class="mr-3">
-                                    <v-icon color="blue">mdi-wallet</v-icon>
-                                </v-avatar>
-                                <div>
-                                    <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                                        Payment Mix
-                                    </div>
-                                    <div class="text-caption grey--text">M-Pesa vs Cash breakdown</div>
-                                </div>
-                            </div>
-                            <v-spacer />
-                            <v-chip small color="green lighten-5" text-color="green darken-2" label class="font-weight-bold">
-                                {{ Math.abs(paymentData.avgMpesaPct) }}% M-Pesa
-                            </v-chip>
-                        </v-card-title>
-                        <v-divider />
-                        <v-card-text class="pa-4 pa-sm-6">
-                            <div class="d-flex align-center justify-center mb-6">
-                                <div class="text-center mr-8">
-                                    <v-progress-circular :value="Math.abs(paymentData.avgMpesaPct)" :size="110" :width="12" color="green" class="mb-2">
-                                        <div class="text-h5 font-weight-bold green--text text--darken-2">
-                                            {{ Math.round(Math.abs(paymentData.avgMpesaPct)) }}%
-                                        </div>
-                                    </v-progress-circular>
-                                    <div class="text-caption grey--text text--darken-1 font-weight-medium">
-                                        M-Pesa
-                                    </div>
-                                    <div class="text-h6 font-weight-bold green--text text--darken-2 mt-1">
-                                        {{ formatNumber(paymentData.totalMpesa) }}
-                                    </div>
-                                </div>
-                                <div class="text-center">
-                                    <v-progress-circular :value="Math.abs(100 - paymentData.avgMpesaPct)" :size="110" :width="12" color="blue" class="mb-2">
-                                        <div class="text-h5 font-weight-bold blue--text text--darken-2">
-                                            {{ Math.round(Math.abs(100 - paymentData.avgMpesaPct)) }}%
-                                        </div>
-                                    </v-progress-circular>
-                                    <div class="text-caption grey--text text--darken-1 font-weight-medium">
-                                        Cash
-                                    </div>
-                                    <div class="text-h6 font-weight-bold blue--text text--darken-2 mt-1">
-                                        {{ formatNumber(paymentData.totalCash) }}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <v-simple-table dense class="payment-table-modern">
-                                <template v-slot:default>
-                                    <thead>
-                                        <tr>
-                                            <th class="text-left text-caption grey--text font-weight-medium">
-                                                Date
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                M-Pesa
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                Cash
-                                            </th>
-                                            <th class="text-right text-caption grey--text font-weight-medium">
-                                                Total
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(row, i) in paymentData.data.slice(0, 5)" :key="i" class="row-modern">
-                                            <td class="text-body-2 py-3">
-                                                {{ formatDateShort(row.date) }}
-                                            </td>
-                                            <td class="text-right text-body-2 green--text py-3">
-                                                {{ formatNumber(row.payment_mpesa) }}
-                                            </td>
-                                            <td class="text-right text-body-2 blue--text py-3">
-                                                {{ formatNumber(row.payment_cash) }}
-                                            </td>
-                                            <td class="text-right text-body-2 font-weight-medium py-3">
-                                                {{
-                            formatNumber(
-                              parseFloat(row.payment_mpesa || 0) + parseFloat(row.payment_cash || 0)
-                            )
-                          }}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </template>
-                            </v-simple-table>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
-            </v-row>
-
-            <!-- Expense Breakdown -->
-            <v-row class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 600ms">
-                <v-col cols="12">
-                    <v-card class="rounded-xl" elevation="1">
-                        <v-card-title class="px-4 px-sm-6 py-4 card-header-modern">
-                            <div class="d-flex align-center">
-                                <v-avatar color="purple lighten-5" size="36" class="mr-3">
-                                    <v-icon color="purple">mdi-receipt-text</v-icon>
-                                </v-avatar>
-                                <div>
-                                    <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                                        Expense Breakdown
-                                    </div>
-                                    <div class="text-caption grey--text">Where your money goes</div>
-                                </div>
-                            </div>
-                            <v-spacer />
-                            <div class="text-h6 font-weight-bold red--text text--darken-2">
-                                {{ formatNumber(expenseData.grandTotal) }}
-                            </div>
-                        </v-card-title>
-                        <v-divider />
-                        <v-card-text class="pa-4 pa-sm-6">
-                            <v-row>
-                                <v-col cols="12" md="6">
-                                    <div v-for="(exp, i) in expenseData.data" :key="i" class="mb-4 expense-item-modern">
-                                        <div class="d-flex justify-space-between align-center mb-2">
-                                            <div class="d-flex align-center">
-                                                <v-icon x-small :color="expenseColors[i % expenseColors.length]" class="mr-2">mdi-circle</v-icon>
-                                                <span class="text-body-2 font-weight-medium grey--text text--darken-2">{{
-                            exp.title
-                          }}</span>
-                                                <v-chip x-small class="ml-2" label color="grey lighten-4">{{
-                            exp.count
-                          }}x</v-chip>
-                                            </div>
-                                            <span class="text-body-2 font-weight-bold grey--text text--darken-2">{{
-                          formatNumber(exp.total)
-                        }}</span>
-                                        </div>
-                                        <v-progress-linear :value="exp.pct" :color="expenseColors[i % expenseColors.length]" rounded height="14" class="rounded-lg progress-modern" background-color="grey lighten-3">
-                                            <template v-slot:default>
-                                                <span class="text-caption white--text font-weight-bold px-1">{{ exp.pct }}%</span>
-                                            </template>
-                                        </v-progress-linear>
-                                    </div>
-                                </v-col>
-                                <v-col cols="12" md="6">
-                                    <v-simple-table dense class="expense-table-modern">
-                                        <template v-slot:default>
-                                            <thead>
-                                                <tr>
-                                                    <th class="text-left text-caption grey--text font-weight-medium py-3">
-                                                        Category
-                                                    </th>
-                                                    <th class="text-right text-caption grey--text font-weight-medium py-3">
-                                                        Total
-                                                    </th>
-                                                    <th class="text-right text-caption grey--text font-weight-medium py-3">
-                                                        %
-                                                    </th>
-                                                    <th class="text-right text-caption grey--text font-weight-medium py-3">
-                                                        Avg
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr v-for="(exp, i) in expenseData.data" :key="i" class="row-modern">
-                                                    <td class="text-body-2 py-3">
-                                                        <v-icon x-small :color="expenseColors[i % expenseColors.length]" class="mr-2">mdi-circle</v-icon>
-                                                        {{ exp.title }}
-                                                    </td>
-                                                    <td class="text-right text-body-2 font-weight-medium py-3">
-                                                        {{ formatNumber(exp.total) }}
-                                                    </td>
-                                                    <td class="text-right py-3">
-                                                        <v-chip x-small :color="
-                                  expenseColors[i % expenseColors.length] + ' lighten-5'
-                                " :text-color="expenseColors[i % expenseColors.length]" label class="font-weight-bold">
-                                                            {{ exp.pct }}%
-                                                        </v-chip>
-                                                    </td>
-                                                    <td class="text-right text-body-2 grey--text py-3">
-                                                        {{ formatNumber(exp.avg_amount) }}
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </template>
-                                    </v-simple-table>
-                                </v-col>
-                            </v-row>
-                        </v-card-text>
-                    </v-card>
-                </v-col>
-            </v-row>
-
-            <!-- Daily Summary Table -->
-            <v-row class="reveal-card" style="animation-delay: 700ms">
-                <v-col cols="12">
-                    <v-card class="rounded-xl" elevation="1">
-                        <v-card-title class="px-4 px-sm-6 py-4 card-header-modern">
-                            <div class="d-flex align-center">
-                                <v-avatar color="teal lighten-5" size="36" class="mr-3">
-                                    <v-icon color="teal">mdi-table</v-icon>
-                                </v-avatar>
-                                <div>
-                                    <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                                        Daily Summary
-                                    </div>
-                                    <div class="text-caption grey--text">
-                                        Complete daily records ({{ dailySummary.length }} days)
-                                    </div>
-                                </div>
-                            </div>
-                            <v-spacer />
-                            <v-btn small text color="red darken-2" class="text-capitalize font-weight-medium rounded-lg" @click="exportCSV">
-                                <v-icon left small>mdi-download</v-icon> Export CSV
-                            </v-btn>
-                        </v-card-title>
-                        <v-divider />
-                        <v-data-table :headers="summaryHeaders" :items="dailySummary" :items-per-page="10" dense class="rounded-b-xl summary-table-modern" mobile-breakpoint="600">
-                            <template v-slot:item.date="{ item }">
-                                <div class="d-flex align-center py-1">
-                                    <v-avatar :color="dateColor(item.date)" size="28" class="mr-2 hidden-xs-only">
-                                        <span class="white--text text-caption font-weight-bold">{{
-                        formatDayShort(item.date)
-                      }}</span>
-                                    </v-avatar>
-                                    <span class="font-weight-medium text-body-2 grey--text text--darken-2">{{
-                      formatDateShort(item.date)
-                    }}</span>
-                                </div>
-                            </template>
-                            <template v-slot:item.revenue="{ item }">
-                                <div class="d-flex flex-column align-end">
-                                    <span class="font-weight-medium text-body-2 grey--text text--darken-2">{{
-                    formatNumber(item.actualRevenue || item.revenue)
-                  }}</span>
-                                    <span v-if="item.expectedRevenue && item.expectedRevenue !== (item.actualRevenue || item.revenue)" class="text-caption grey--text">
-                                        Exp: {{ formatNumber(item.expectedRevenue) }}
-                                    </span>
-                                </div>
-                            </template>
-                            <template v-slot:item.profit="{ item }">
-                                <v-chip x-small :color="(item.actualProfit || item.profit) >= 0 ? 'green lighten-5' : 'red lighten-5'" :text-color="(item.actualProfit || item.profit) >= 0 ? 'green darken-2' : 'red darken-2'" label class="font-weight-bold">
-                                    {{ formatNumber(item.actualProfit || item.profit) }}
-                                </v-chip>
-                            </template>
-                            <template v-slot:item.margin_pct="{ item }">
-                                <span class="font-weight-bold text-body-2" :class="
-                      (item.actualMarginPct || item.margin_pct) >= 20
-                        ? 'green--text'
-                        : (item.actualMarginPct || item.margin_pct) >= 10
-                        ? 'orange--text'
-                        : 'red--text'
-                    ">
-                                    {{ parseFloat(item.actualMarginPct || item.margin_pct || 0).toFixed(1) }}%
-                                </span>
-                            </template>
-                            <template v-slot:item.waste_pct="{ item }">
-                                <v-chip x-small :color="item.waste_pct > 5 ? 'red lighten-5' : 'grey lighten-4'" :text-color="item.waste_pct > 5 ? 'red' : 'grey'" label class="font-weight-bold">
-                                    {{ parseFloat(item.waste_pct || 0).toFixed(1) }}%
-                                </v-chip>
-                            </template>
-                            <template v-slot:item.sold_kg="{ item }">
-                                <span class="text-body-2 grey--text text--darken-1">{{ item.sold_kg }} kg</span>
-                            </template>
-                            <template v-slot:no-data>
-                                <div class="pa-8 text-center">
-                                    <v-icon size="48" color="grey lighten-2">mdi-chart-bar</v-icon>
-                                    <div class="text-h6 grey--text mt-3">No data available</div>
-                                    <div class="text-body-2 grey--text text--lighten-1 mb-4">
-                                        Select a different time period or record some entries first
-                                    </div>
-                                </div>
-                            </template>
-                        </v-data-table>
-                    </v-card>
-                </v-col>
-            </v-row>
-        </v-container>
-    </v-main>
-
-    <!-- Mobile Bottom Nav -->
-    <v-bottom-navigation v-if="nav_bars" v-model="bottomNav" color="red darken-2" grow fixed class="elevation-8 bottom-nav-modern" style="z-index: 100">
-        <v-btn to="/dashboard">
-            <span>Home</span>
-            <v-icon>mdi-home</v-icon>
-        </v-btn>
-        <v-btn to="/reports">
-            <span>Reports</span>
-            <v-icon>mdi-chart-line</v-icon>
-        </v-btn>
-        <v-btn to="/profile">
-            <span>Profile</span>
-            <v-icon>mdi-account</v-icon>
-        </v-btn>
-        <v-btn @click="logout">
-            <span>Exit</span>
-            <v-icon>mdi-logout</v-icon>
-        </v-btn>
-    </v-bottom-navigation>
-
-    <!-- Mobile Drawer -->
-    <v-navigation-drawer v-model="mobileDrawer" temporary right width="280" class="mobile-drawer-modern">
-        <div class="pa-6">
-            <div class="d-flex align-center mb-8">
-                <v-avatar color="red darken-2" size="36" class="mr-3">
-                    <v-icon color="white" size="20">mdi-food-steak</v-icon>
-                </v-avatar>
-                <div>
-                    <div class="text-h6 font-weight-bold red--text text--darken-2">MeatPro</div>
-                    <div class="text-caption grey--text">{{ shopName || 'Analytics' }}</div>
+                  <div class="metric">
+                    <span class="metric-label">Margin</span>
+                    <span class="metric-value" :class="getMarginClass(day)">
+                      {{ formatMargin(day.avg_actual_profit || day.avg_profit, day.avg_actual_revenue || day.avg_revenue) }}
+                    </span>
+                  </div>
                 </div>
+              </div>
             </div>
-            <v-list dense class="pa-0">
-                <v-list-item v-for="item in menuItems" :key="item.title" :to="item.to" class="rounded-xl mb-1" active-class="red lighten-5 red--text">
-                    <v-list-item-icon class="mr-3">
-                        <v-icon color="grey darken-1">{{ item.icon }}</v-icon>
-                    </v-list-item-icon>
-                    <v-list-item-title class="text-body-2 font-weight-medium">{{
-              item.title
-            }}</v-list-item-title>
-                </v-list-item>
-            </v-list>
-            <v-divider class="my-4" />
-
-            <!-- Setup Branches for Pro users -->
-            <v-slide-y-transition>
-                <v-btn
-                    v-if="subData?.subscription?.tier === 'pro'"
-                    block
-                    color="red darken-2"
-                    dark
-                    class="rounded-xl text-capitalize font-weight-bold mb-3"
-                    to="/setupbranch"
-                >
-                    <v-icon left small>mdi-store-plus</v-icon>
-                    Setup Branches
-                </v-btn>
-            </v-slide-y-transition>
-
-            <v-btn block outlined color="grey darken-1" class="rounded-xl text-capitalize" @click="logout">
-                <v-icon left size="18">mdi-logout</v-icon> Sign Out
-            </v-btn>
+          </div>
         </div>
-    </v-navigation-drawer>
+      </div>
 
-    <!-- Snackbar -->
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="4000" bottom rounded="pill" class="mb-6 snackbar-modern" elevation="6">
-        <div class="d-flex align-center">
-            <v-avatar :color="snackbar.color === 'success' ? 'green darken-2' : 'red darken-2'" size="28" class="mr-3">
-                <v-icon color="white" small>{{
-            snackbar.color === 'success' ? 'mdi-check' : 'mdi-alert'
-          }}</v-icon>
-            </v-avatar>
-            <span class="font-weight-medium">{{ snackbar.text }}</span>
+      <!-- ===== ANALYTICS ROW ===== -->
+      <div class="analytics-row">
+        <!-- Waste Analysis -->
+        <div class="analytics-card">
+          <div class="card-header-flex">
+            <div>
+              <h3><i class="fas fa-trash-alt"></i> Waste Analysis</h3>
+              <p class="card-subtitle">Cost of spoilage & trimmings</p>
+            </div>
+            <span class="badge">{{ wasteData.avgWastePct || 0 }}% avg</span>
+          </div>
+          <div class="waste-total">
+            <span>Total Waste Cost</span>
+            <strong>{{ formatCurrency(wasteData.totalWasteCost) }}</strong>
+          </div>
+          <div class="data-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Waste (kg)</th>
+                  <th>%</th>
+                  <th>Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, i) in wasteData.data" :key="i">
+                  <td>{{ formatDate(item.date) }}</td>
+                  <td>{{ item.waste_kg }} kg</td>
+                  <td><span class="pct-badge">{{ parseFloat(item.waste_pct || 0).toFixed(1) }}%</span></td>
+                  <td>{{ formatCurrency(item.waste_cost) }}</td>
+                </tr>
+                <tr v-if="!wasteData.data || wasteData.data.length === 0">
+                  <td colspan="4" class="empty-cell">No waste data</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <template v-slot:action="{ attrs }">
-            <v-btn text v-bind="attrs" @click="snackbar.show = false" class="text-capitalize font-weight-bold white--text">Close</v-btn>
-        </template>
-    </v-snackbar>
-</div>
+
+        <!-- Payment Mix -->
+        <div class="analytics-card">
+          <div class="card-header-flex">
+            <div>
+              <h3><i class="fas fa-credit-card"></i> Payment Mix</h3>
+              <p class="card-subtitle">M-Pesa vs Cash breakdown</p>
+            </div>
+            <span class="badge mpesa">{{ paymentMix.avgMpesaPct || 0 }}% M-Pesa</span>
+          </div>
+          <div class="payment-donuts">
+            <div class="donut-wrap">
+              <div class="donut" :style="donutStyleMpesa">
+                <span class="donut-label">{{ paymentMix.avgMpesaPct || 0 }}%</span>
+              </div>
+              <span class="donut-name">M-Pesa</span>
+              <span class="donut-amount">{{ formatCurrency(paymentMix.totalMpesa) }}</span>
+            </div>
+            <div class="donut-wrap">
+              <div class="donut" :style="donutStyleCash">
+                <span class="donut-label">{{ cashPct }}%</span>
+              </div>
+              <span class="donut-name">Cash</span>
+              <span class="donut-amount">{{ formatCurrency(paymentMix.totalCash) }}</span>
+            </div>
+          </div>
+          <div v-if="showPaymentVariance" class="variance-mini">
+            <i class="fas fa-exclamation-circle"></i>
+            Revenue variance: {{ formatCurrency(paymentMix.revenueVariance) }}
+          </div>
+          <div class="data-table compact">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>M-Pesa</th>
+                  <th>Cash</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, i) in paymentMix.data" :key="i">
+                  <td>{{ formatDate(item.date) }}</td>
+                  <td class="mpesa">{{ formatCurrency(item.payment_mpesa) }}</td>
+                  <td class="cash">{{ formatCurrency(item.payment_cash) }}</td>
+                  <td><strong>{{ formatCurrency(getItemActualRevenue(item)) }}</strong></td>
+                </tr>
+                <tr v-if="!paymentMix.data || paymentMix.data.length === 0">
+                  <td colspan="4" class="empty-cell">No payment data</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== EXPENSE BREAKDOWN ===== -->
+      <div class="expense-card">
+        <div class="card-header-flex">
+          <div>
+            <h3><i class="fas fa-receipt"></i> Expense Breakdown</h3>
+            <p class="card-subtitle">Where your money goes</p>
+          </div>
+          <span class="total-expense">{{ formatCurrency(expenseData.grandTotal) }}</span>
+        </div>
+        <div class="expense-grid">
+          <div class="expense-bars">
+            <div v-for="(item, i) in expenseData.data" :key="i" class="expense-bar-item">
+              <div class="expense-info">
+                <span class="expense-dot" :style="{ background: expenseColors[i % expenseColors.length] }"></span>
+                <span class="expense-name">{{ item.title }}</span>
+                <span class="expense-count">{{ item.count }}x</span>
+              </div>
+              <div class="expense-bar-track">
+                <div 
+                  class="expense-bar-fill" 
+                  :style="{ width: (item.pct || 0) + '%', background: expenseColors[i % expenseColors.length] }"
+                ></div>
+              </div>
+              <div class="expense-amount">{{ formatCurrency(item.total) }}</div>
+            </div>
+            <div v-if="!expenseData.data || expenseData.data.length === 0" class="empty-state small">
+              <p>No expense data</p>
+            </div>
+          </div>
+          <div class="expense-table-wrap">
+            <table class="expense-table">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th>Total</th>
+                  <th>%</th>
+                  <th>Avg</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, i) in expenseData.data" :key="i">
+                  <td>
+                    <span class="dot-sm" :style="{ background: expenseColors[i % expenseColors.length] }"></span>
+                    {{ item.title }}
+                  </td>
+                  <td>{{ formatCurrency(item.total) }}</td>
+                  <td><span class="pct-badge">{{ item.pct || 0 }}%</span></td>
+                  <td>{{ formatCurrency(item.avg_amount) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== DAILY SUMMARY ===== -->
+      <div class="summary-card">
+        <div class="card-header-flex">
+          <div>
+            <h3><i class="fas fa-table"></i> Daily Summary</h3>
+            <p class="card-subtitle">Complete daily records ({{ dailySummary.length }} days)</p>
+          </div>
+          <button class="export-btn" @click="exportCSV">
+            <i class="fas fa-download"></i> Export CSV
+          </button>
+        </div>
+        <div class="data-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Actual Revenue</th>
+                <th>Expected Revenue</th>
+                <th>Actual Profit</th>
+                <th>Margin</th>
+                <th>Sold</th>
+                <th>Waste %</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, i) in paginatedSummary" :key="i">
+                <td>
+                  <div class="date-cell">
+                    <span class="date-day">{{ formatDay(item.date) }}</span>
+                    <span class="date-full">{{ formatDate(item.date) }}</span>
+                  </div>
+                </td>
+                <td>
+                  <strong>{{ formatCurrency(item.actual_revenue || item.revenue) }}</strong>
+                </td>
+                <td class="muted">
+                  {{ formatCurrency(item.expected_revenue || item.revenue) }}
+                </td>
+                <td>
+                  <span class="chip" :class="getAmountClass(item.actual_profit || item.profit)">
+                    {{ formatCurrency(item.actual_profit || item.profit) }}
+                  </span>
+                </td>
+                <td>
+                  <span :class="getAmountClass(getItemMargin(item))">
+                    {{ getItemMargin(item).toFixed(1) }}%
+                  </span>
+                </td>
+                <td>{{ item.sold_kg || 0 }} kg</td>
+                <td>
+                  <span class="waste-badge" :class="getWasteClass(item)">
+                    {{ getWastePct(item) }}%
+                  </span>
+                </td>
+              </tr>
+              <tr v-if="dailySummary.length === 0">
+                <td colspan="7" class="empty-cell">No daily records found</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" v-if="dailySummary.length > rowsPerPage">
+          <span>Rows per page: 
+            <select v-model="rowsPerPage">
+              <option :value="10">10</option>
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+            </select>
+          </span>
+          <span>{{ paginationText }}</span>
+          <div class="page-nav">
+            <button :disabled="currentPage === 1" @click="currentPage--"><i class="fas fa-chevron-left"></i></button>
+            <button :disabled="currentPage >= totalPages" @click="currentPage++"><i class="fas fa-chevron-right"></i></button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>
 
 <script>
-import moment from 'moment'
-import numeral from 'numeral'
-import axios from 'axios'
-import apiClient from '../services/api'
-import Subscription from './subscription.vue';
+import api from '@/services/api'; // Assuming you have an API service for axios
 
 export default {
-    name: 'Reports',
+  name: 'Reports',
+  data() {
+    return {
+      loading: false,
+      selectedBranch: 1,
+      selectedPeriod: '30',
+      branches: [
+        { id: 1, name: 'Grace cuts Kasa' },
+        { id: 2, name: 'Branch 2' }
+      ],
 
-    data() {
-        return {
-            // ── Subscription Gate ──
-            subLoading: true,
-            subActive: false,
-            subData: null,
-            // ── Existing Data ──
-            branches: [],
-            selectedBranch: null,
-            proStatus: false,
-            mpesaReceipt: null,
-            subscription: null,
-            userProfile: null,
-            nav_bars: false,
-            mobileDrawer: false,
-            bottomNav: 1,
-            loading: false,
-            periodDays: 30,
-            periodOptions: [{
-                    label: '7 Days',
-                    value: 7,
-                },
-                {
-                    label: '30 Days',
-                    value: 30,
-                },
-                {
-                    label: '90 Days',
-                    value: 90,
-                },
-            ],
-            user: null,
-            shopName: '',
-            branchId: null,
+      comparative: {
+        thisMonth: { expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, sold: 0, avg_waste: 0, expenses: 0 },
+        lastMonth: { expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, sold: 0, avg_waste: 0, expenses: 0 },
+        changes: { expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, sold: 0, waste: 0 }
+      },
 
-            comparative: {
-                thisMonth: {
-                    revenue: 0,
-                    profit: 0,
-                    sold: 0,
-                    avg_waste: 0,
-                    // New fields for actual vs expected
-                    actualRevenue: 0,
-                    expectedRevenue: 0,
-                    actualProfit: 0,
-                    expectedProfit: 0,
-                },
-                lastMonth: {
-                    revenue: 0,
-                    profit: 0,
-                    sold: 0,
-                    avg_waste: 0,
-                    actualRevenue: 0,
-                    expectedRevenue: 0,
-                    actualProfit: 0,
-                    expectedProfit: 0,
-                },
-                changes: {
-                    revenue: 0,
-                    profit: 0,
-                    sold: 0,
-                    waste: 0,
-                },
-            },
+      profitTrend: [],
+      dayOfWeek: [],
 
-            profitTrend: [],
-            dayOfWeek: [],
-            avgMargin: 0,
+      wasteData: { data: [], avgWastePct: 0, totalWasteCost: 0 },
+      paymentMix: { data: [], totalCash: 0, totalMpesa: 0, totalActualRevenue: 0, totalExpectedRevenue: 0, avgMpesaPct: 0, revenueVariance: 0 },
+      expenseData: { data: [], grandTotal: 0 },
+      dailySummary: [],
 
-            wasteData: {
-                data: [],
-                avgWastePct: 0,
-                totalWasteCost: 0,
-            },
-            paymentData: {
-                data: [],
-                totalCash: 0,
-                totalMpesa: 0,
-                totalRevenue: 0,
-                avgMpesaPct: 0,
-            },
-            expenseData: {
-                data: [],
-                grandTotal: 0,
-            },
-            dailySummary: [],
+      currentPage: 1,
+      rowsPerPage: 10,
 
-            expenseColors: [
-                'red',
-                'blue',
-                'green',
-                'orange',
-                'purple',
-                'teal',
-                'pink',
-                'indigo',
-            ],
+      dayColors: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4'],
+      expenseColors: ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16']
+    };
+  },
 
-            summaryHeaders: [{
-                    text: 'Date',
-                    value: 'date',
-                    width: '120',
-                },
-                {
-                    text: 'Revenue',
-                    value: 'revenue',
-                    align: 'end',
-                },
-                {
-                    text: 'Profit',
-                    value: 'profit',
-                    align: 'end',
-                },
-                {
-                    text: 'Margin',
-                    value: 'margin_pct',
-                    align: 'end',
-                },
-                {
-                    text: 'Sold',
-                    value: 'sold_kg',
-                    align: 'end',
-                },
-                {
-                    text: 'Waste %',
-                    value: 'waste_pct',
-                    align: 'end',
-                },
-            ],
-
-            snackbar: {
-                show: false,
-                text: '',
-                color: 'success',
-            },
-            authUnsubscribe: null,
-
-            menuItems: [{
-                    title: 'Dashboard',
-                    icon: 'mdi-view-dashboard',
-                    to: '/dashboard',
-                },
-                {
-                    title: 'Reports',
-                    icon: 'mdi-chart-line',
-                    to: '/reports',
-                },
-                {
-                    title: 'Profile',
-                    icon: 'mdi-account',
-                    to: '/profile',
-                },
-            ],
-        }
+  computed: {
+    periodLabel() {
+      const map = { '7': 'Last 7 days', '30': 'Last 30 days', '90': 'Last 90 days' };
+      return map[this.selectedPeriod] || 'Last 30 days';
     },
 
-    computed: {
-        comparativeCards() {
-            // Use actual revenue/profit when available, fall back to legacy revenue/profit
-            const thisMonthActualRevenue = this.comparative.thisMonth.actualRevenue || this.comparative.thisMonth.revenue || 0
-            const thisMonthExpectedRevenue = this.comparative.thisMonth.expectedRevenue || this.comparative.thisMonth.revenue || 0
-            const thisMonthActualProfit = this.comparative.thisMonth.actualProfit || this.comparative.thisMonth.profit || 0
-            const thisMonthExpectedProfit = this.comparative.thisMonth.expectedProfit || this.comparative.thisMonth.profit || 0
-
-            return [{
-                    label: 'Revenue',
-                    value: this.formatNumber(thisMonthActualRevenue),
-                    expectedValue: thisMonthExpectedRevenue !== thisMonthActualRevenue ? this.formatNumber(thisMonthExpectedRevenue) : null,
-                    showBreakdown: true,
-                    change: parseFloat(this.comparative.changes.revenue),
-                    icon: 'mdi-cash-multiple',
-                    bgColor: 'green lighten-5',
-                    iconColor: 'green',
-                },
-                {
-                    label: 'Net Profit',
-                    value: this.formatNumber(thisMonthActualProfit),
-                    change: parseFloat(this.comparative.changes.profit),
-                    icon: 'mdi-trending-up',
-                    bgColor: thisMonthActualProfit >= 0 ?
-                        'green lighten-5' :
-                        'red lighten-5',
-                    iconColor: thisMonthActualProfit >= 0 ? 'green' : 'red',
-                },
-                {
-                    label: 'Volume Sold',
-                    value: `${this.comparative.thisMonth.sold || 0} kg`,
-                    change: parseFloat(this.comparative.changes.sold),
-                    icon: 'mdi-weight-kilogram',
-                    bgColor: 'blue lighten-5',
-                    iconColor: 'blue',
-                },
-                {
-                    label: 'Waste Rate',
-                    value: `${parseFloat(
-            this.comparative.thisMonth.avg_waste || 0
-          ).toFixed(1)} kg/day`,
-                    change: parseFloat(this.comparative.changes.waste),
-                    icon: 'mdi-delete-variant',
-                    bgColor: 'red lighten-5',
-                    iconColor: 'red',
-                },
-            ]
-        },
-
-        // Calculate revenue variance for alert
-        revenueVariance() {
-            const expected = this.comparative.thisMonth.expectedRevenue || this.comparative.thisMonth.revenue || 0
-            const actual = this.comparative.thisMonth.actualRevenue || this.comparative.thisMonth.revenue || 0
-            return expected - actual
-        },
+    hasComparativeData() {
+      return this.comparative && this.comparative.thisMonth && 
+             (this.comparative.thisMonth.actual_revenue > 0 || this.comparative.thisMonth.expected_revenue > 0);
     },
 
-    methods: {
-        async loadBranches() {
-            try {
-                if (!this.user?.uid) return
-                const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`)
-                this.branches = data || []
-                console.log('Branches loaded:', this.branches)
-
-                // Auto-select first branch if selector is currently empty
-                if (!this.selectedBranch && this.branches.length > 0) {
-                    const first = this.branches[0]
-                    this.selectedBranch = first.name
-                    this.branchId = first.id
-                } else if (this.branchId && this.branches.length) {
-                    // Sync the dropdown label to the currently active branchId
-                    const current = this.branches.find(b => b.id === this.branchId)
-                    if (current) {
-                        this.selectedBranch = current.name
-                    }
-                }
-            } catch (e) {
-                console.error('Branches load error:', e)
-                this.branches = []
-            }
-        },
-        checkPaymentInfo(val) {
-            if (val == null) {
-                if (this.subscription === 'pro') {
-
-                } else {
-                    this.showSnackbar('Please set your M-Pesa receipt number in your profile.', 'error')
-                    this.$router.push('/subscription')
-                }
-
-            }
-        },
-        formatNumber(val) {
-            return numeral(val || 0).format('0,0')
-        },
-        formatNumberShort(val) {
-            return numeral(val || 0)
-                .format('0.0a')
-                .toUpperCase()
-        },
-        formatDateShort(date) {
-            return moment(date).format('MMM D')
-        },
-        formatDayShort(date) {
-            return moment(date).format('D')
-        },
-        dayColor(index) {
-            const colors = [
-                'red',
-                'blue',
-                'green',
-                'orange',
-                'purple',
-                'teal',
-                'pink',
-            ]
-            return colors[index % colors.length]
-        },
-        dayMargin(day) {
-            const revenue = day.avg_actual_revenue || day.avg_revenue || 0
-            const profit = day.avg_actual_profit || day.avg_profit || 0
-            return revenue ? ((profit / revenue) * 100).toFixed(1) : 0
-        },
-        dateColor(date) {
-            const day = moment(date).day()
-            return day === 0 || day === 6 ? 'red lighten-4' : 'grey lighten-3'
-        },
-
-        async apiCall(method, endpoint, data = null) {
-            try {
-                const response = await apiClient.request({
-                    method,
-                    url: endpoint,
-                    data,
-                })
-                return response.data
-            } catch (error) {
-                const msg = error.response.data.message || error.message
-                this.showSnackbar(msg, 'error')
-                throw error
-            }
-        },
-
-        async refreshAll() {
-            if (this.loading) return
-            this.loading = true
-
-             await this.loadUserProfile()
-
-        // Load branches for Pro subscribers; auto-select if empty
-        if (this.proStatus === true) {
-          await this.loadBranches()
-        }
-
-            try {
-                await Promise.all([
-                    this.loadComparative(),
-                    this.loadProfitabilityAndSummary(),
-                    this.loadWaste(),
-                    this.loadPayment(),
-                    this.loadExpenses(),
-                ])
-            } finally {
-                this.loading = false
-            }
-        },
-
-        async loadComparative() {
-            try {
-                const data = await this.apiCall(
-                    'get',
-                    `/reports/comparative?branch_id=${this.branchId}`
-                )
-
-                // Normalize data: ensure actualRevenue/actualProfit exist for new backend
-                // while maintaining backward compatibility with old backend
-                const normalizeMonth = (month) => ({
-                    ...month,
-                    actualRevenue: month.actualRevenue || month.revenue || 0,
-                    expectedRevenue: month.expectedRevenue || month.revenue || 0,
-                    actualProfit: month.actualProfit || month.profit || 0,
-                    expectedProfit: month.expectedProfit || month.profit || 0,
-                })
-
-                this.comparative = Object.freeze({
-                    ...data,
-                    thisMonth: normalizeMonth(data.thisMonth || {}),
-                    lastMonth: normalizeMonth(data.lastMonth || {}),
-                })
-            } catch (e) {
-                console.error('Comparative error', e)
-            }
-        },
-
-        async loadProfitabilityAndSummary() {
-            try {
-                const data = await this.apiCall(
-                    'get',
-                    `/reports/profitability?branch_id=${this.branchId}&days=${this.periodDays}`
-                )
-
-                // Normalize dayOfWeek data
-                this.dayOfWeek = Object.freeze((data.dayOfWeek || []).map(day => ({
-                    ...day,
-                    avg_actual_revenue: day.avg_actual_revenue || day.avg_revenue || 0,
-                    avg_actual_profit: day.avg_actual_profit || day.avg_profit || 0,
-                })))
-
-                // Normalize daily data for profit trend and summary
-                const normalizedDaily = (data.daily || []).map(d => ({
-                    ...d,
-                    // Use actual values when available, fall back to legacy fields
-                    actualRevenue: d.actualRevenue || (parseFloat(d.payment_cash || 0) + parseFloat(d.payment_mpesa || 0)) || d.revenue || 0,
-                    expectedRevenue: d.expectedRevenue || d.revenue || 0,
-                    actualProfit: d.actualProfit || d.profit || 0,
-                    expectedProfit: d.expectedProfit || d.profit || 0,
-                    actualMarginPct: d.actualMarginPct || d.margin_pct || 0,
-                }))
-
-                const maxProfit = Math.max(
-                    ...normalizedDaily.map((d) => Math.abs(parseFloat(d.actualProfit) || 0)),
-                    1
-                )
-                this.profitTrend = Object.freeze(normalizedDaily.map((d) => ({
-                    date: d.date,
-                    profit: parseFloat(d.actualProfit) || 0,
-                    revenue: parseFloat(d.actualRevenue) || 0,
-                    pct: ((Math.abs(parseFloat(d.actualProfit) || 0) / maxProfit) * 80 + 5),
-                })))
-
-                const totalMargin = normalizedDaily.reduce(
-                    (s, d) => s + (parseFloat(d.actualMarginPct) || 0),
-                    0
-                )
-                this.avgMargin = normalizedDaily.length ?
-                    (totalMargin / normalizedDaily.length).toFixed(1) :
-                    0
-
-                this.dailySummary = Object.freeze(normalizedDaily.slice().reverse().map((d) => ({
-                    ...d,
-                    waste_pct: d.revenue ?
-                        (parseFloat(d.waste_kg || 0) / parseFloat(d.sold_kg || 1)) * 100 :
-                        0,
-                })))
-            } catch (e) {
-                console.error('Profitability error', e)
-            }
-        },
-
-        async loadWaste() {
-            try {
-                const data = await this.apiCall(
-                    'get',
-                    `/reports/waste-analysis?branch_id=${this.branchId}&days=${this.periodDays}`
-                )
-                this.wasteData = {
-                    ...data,
-                    data: Object.freeze(data.data)
-                }
-            } catch (e) {
-                console.error('Waste error', e)
-            }
-        },
-
-        async loadPayment() {
-            try {
-                const data = await this.apiCall(
-                    'get',
-                    `/reports/payment-mix?branch_id=${this.branchId}&days=${this.periodDays}`
-                )
-                this.paymentData = {
-                    ...data,
-                    data: Object.freeze(data.data)
-                }
-            } catch (e) {
-                console.error('Payment error', e)
-            }
-        },
-
-        async loadExpenses() {
-            try {
-                const data = await this.apiCall(
-                    'get',
-                    `/reports/expense-breakdown?branch_id=${this.branchId}&days=${this.periodDays}`
-                )
-                this.expenseData = {
-                    ...data,
-                    data: Object.freeze(data.data)
-                }
-            } catch (e) {
-                console.error('Expense error', e)
-            }
-        },
-
-        exportCSV() {
-            const headers = ['Date', 'Actual Revenue', 'Expected Revenue', 'Actual Profit', 'Expected Profit', 'Margin %', 'Sold kg', 'Waste %', 'Cash', 'M-Pesa']
-            const rows = this.dailySummary.map((d) => [
-                d.date,
-                d.actualRevenue || d.revenue || 0,
-                d.expectedRevenue || d.revenue || 0,
-                d.actualProfit || d.profit || 0,
-                d.expectedProfit || d.profit || 0,
-                d.actualMarginPct || d.margin_pct || 0,
-                d.sold_kg,
-                d.waste_pct,
-                d.payment_cash || 0,
-                d.payment_mpesa || 0,
-            ])
-            const csv = [headers, ...rows].map((r) => r.join(',')).join('\n')
-            const blob = new Blob([csv], {
-                type: 'text/csv',
-            })
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `meatpro-report-${moment().format('YYYY-MM-DD')}.csv`
-            a.click()
-            URL.revokeObjectURL(url)
-            this.showSnackbar('CSV exported', 'success')
-        },
-
-        showSnackbar(text, color = 'success') {
-            this.snackbar = {
-                show: true,
-                text,
-                color,
-            }
-        },
-
-        onResize() {
-            this.nav_bars = window.innerWidth < 768
-        },
-
-        logout() {
-            this.$fire.auth.signOut()
-            this.$router.push('/login')
-        },
-        async checkSubscription() {
-            this.subLoading = true
-            try {
-                if (!this.user?.uid) {
-                    this.subActive = false
-                    return
-                }
-                const { data } = await apiClient.get(`/subscriptions/status?firebase_uid=${this.user.uid}`)
-                this.subData = data
-                this.subActive = data?.is_active === true
-            } catch (e) {
-                console.error('Subscription check error:', e)
-                this.subActive = false
-                this.subData = null
-            } finally {
-                this.subLoading = false
-            }
-        },
-
-        SelectionChange(branchName) {
-            if (!branchName) return
-            const branch = this.branches.find(b => b.name === branchName)
-            if (!branch) return
-            this.selectedBranch = branchName
-            this.branchId = branch.id
-            this.refreshAll()
-        },
-
-        async loadUserProfile() {
-            try {
-                if (!this.user?.uid) return
-                const { data } = await apiClient.get(`/users/${this.user.uid}/profile`)
-                this.userProfile = data
-                if (data.subscription === 'pro') {
-                    this.proStatus = true
-                }else {
-                    this.proStatus = false
-                }
-                if (data.business_name) this.shopName = data.business_name
-                if (data.mpesa_receipt) this.mpesaReceipt = data.mpesa_receipt
-                if (data.subscription) this.subscription = data.subscription
-                // Only set default branchId from profile if user hasn't selected one yet
-                if (data.branch_id && !this.branchId) {
-                    this.branchId = data.branch_id
-                }
-            } catch (e) {
-                console.error('Profile load error:', e)
-            }
-        },
+    revenueVariance() {
+      if (!this.comparative || !this.comparative.thisMonth) return 0;
+      return (this.comparative.thisMonth.expected_revenue || 0) - (this.comparative.thisMonth.actual_revenue || 0);
     },
 
-    mounted() {
-        this.onResize()
-        window.addEventListener('resize', this.onResize)
-
-        this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
-            if (user) {
-                this.user = user
-                // Check subscription first, then load data
-                this.checkSubscription().then(() => {
-                    this.loadUserProfile()
-                    // Load branches for Pro subscribers; auto-select if empty
-                    if (this.subData?.subscription?.tier === 'pro') {
-                        this.loadBranches().then(() => {
-                            this.refreshAll()
-                        })
-                    } else {
-                        this.refreshAll()
-                    }
-                })
-            } else {
-                this.$router.push('/login')
-            }
-        })
+    hasRevenueVariance() {
+      return Math.abs(this.revenueVariance) > 0.01;
     },
 
-    watch: {
-        selectedBranch(newVal, oldVal) {
-            // If user clears the selector, reload branches and auto-select first one
-            if (!newVal && oldVal && this.subData?.subscription?.tier === 'pro') {
-                this.loadBranches()
-            }
-        },
+    hasProfitVariance() {
+      if (!this.comparative || !this.comparative.thisMonth) return false;
+      return Math.abs((this.comparative.thisMonth.expected_profit || 0) - (this.comparative.thisMonth.actual_profit || 0)) > 0.01;
     },
 
-    beforeDestroy() {
-        window.removeEventListener('resize', this.onResize)
-        if (this.authUnsubscribe) {
-            this.authUnsubscribe()
-        }
+    showVarianceAlert() {
+      return this.hasRevenueVariance && this.hasComparativeData;
     },
-}
+
+    hasProfitTrend() {
+      return this.profitTrend && this.profitTrend.length > 0;
+    },
+
+    maxProfit() {
+      if (!this.hasProfitTrend) return 1;
+      const values = this.profitTrend.map(d => Math.abs(parseFloat(d.actual_profit || d.profit || 0)));
+      return Math.max(...values, 1);
+    },
+
+    hasDayOfWeek() {
+      return this.dayOfWeek && this.dayOfWeek.length > 0;
+    },
+
+    sortedDays() {
+      if (!this.dayOfWeek) return [];
+      return [...this.dayOfWeek].sort((a, b) => {
+        const aRev = parseFloat(a.avg_actual_revenue || a.avg_revenue || 0);
+        const bRev = parseFloat(b.avg_actual_revenue || b.avg_revenue || 0);
+        return bRev - aRev;
+      });
+    },
+
+    cashPct() {
+      const mpesa = parseFloat(this.paymentMix.avgMpesaPct) || 0;
+      return (100 - mpesa).toFixed(0);
+    },
+
+    donutStyleMpesa() {
+      const pct = parseFloat(this.paymentMix.avgMpesaPct) || 0;
+      return {
+        background: `conic-gradient(#10b981 0% ${pct}%, #e5e7eb ${pct}% 100%)`
+      };
+    },
+
+    donutStyleCash() {
+      const pct = parseFloat(this.cashPct) || 0;
+      return {
+        background: `conic-gradient(#3b82f6 0% ${pct}%, #e5e7eb ${pct}% 100%)`
+      };
+    },
+
+    showPaymentVariance() {
+      return this.paymentMix && Math.abs(this.paymentMix.revenueVariance || 0) > 0.01;
+    },
+
+    totalPages() {
+      return Math.ceil((this.dailySummary || []).length / this.rowsPerPage);
+    },
+
+    paginatedSummary() {
+      const start = (this.currentPage - 1) * this.rowsPerPage;
+      return (this.dailySummary || []).slice(start, start + this.rowsPerPage);
+    },
+
+    paginationText() {
+      const total = (this.dailySummary || []).length;
+      if (total === 0) return '0 of 0';
+      const start = (this.currentPage - 1) * this.rowsPerPage + 1;
+      const end = Math.min(this.currentPage * this.rowsPerPage, total);
+      return `${start}-${end} of ${total}`;
+    }
+  },
+
+  watch: {
+    selectedPeriod() { this.loadAll(); },
+    selectedBranch() { this.loadAll(); }
+  },
+
+  mounted() {
+    this.loadAll();
+  },
+
+  methods: {
+    async loadAll() {
+      this.loading = true;
+      try {
+        await Promise.all([
+          this.loadComparative(),
+          this.loadProfitability(),
+          this.loadWaste(),
+          this.loadPaymentMix(),
+          this.loadExpenses()
+        ]);
+      } catch (e) {
+        console.error('Failed to load reports:', e);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async loadComparative() {
+      try {
+        const { data } = await api.get(`/reports/comparative`, {
+          params: { branch_id: this.selectedBranch }
+        });
+        // Defensive: ensure all nested objects exist
+        this.comparative = {
+          thisMonth: { 
+            expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, 
+            sold: 0, avg_waste: 0, expenses: 0,
+            ...(data.thisMonth || {})
+          },
+          lastMonth: { 
+            expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, 
+            sold: 0, avg_waste: 0, expenses: 0,
+            ...(data.lastMonth || {})
+          },
+          changes: { 
+            expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, 
+            sold: 0, waste: 0,
+            ...(data.changes || {})
+          }
+        };
+      } catch (e) {
+        console.error('loadComparative failed:', e);
+      }
+    },
+
+    async loadProfitability() {
+      try {
+        const { data } = await api.get(`/reports/profitability`, {
+          params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
+        });
+        this.profitTrend = data.daily || [];
+        this.dayOfWeek = data.dayOfWeek || [];
+        this.dailySummary = [...(data.daily || [])].reverse();
+        this.currentPage = 1;
+      } catch (e) {
+        console.error('loadProfitability failed:', e);
+        this.profitTrend = [];
+        this.dayOfWeek = [];
+        this.dailySummary = [];
+      }
+    },
+
+    async loadWaste() {
+      try {
+        const { data } = await api.get(`/reports/waste-analysis`, {
+          params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
+        });
+        this.wasteData = {
+          data: data.data || [],
+          avgWastePct: data.avgWastePct || 0,
+          totalWasteCost: data.totalWasteCost || 0
+        };
+      } catch (e) {
+        console.error('loadWaste failed:', e);
+        this.wasteData = { data: [], avgWastePct: 0, totalWasteCost: 0 };
+      }
+    },
+
+    async loadPaymentMix() {
+      try {
+        const { data } = await api.get(`/reports/payment-mix`, {
+          params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
+        });
+        this.paymentMix = {
+          data: data.data || [],
+          totalCash: data.totalCash || 0,
+          totalMpesa: data.totalMpesa || 0,
+          totalActualRevenue: data.totalActualRevenue || 0,
+          totalExpectedRevenue: data.totalExpectedRevenue || 0,
+          avgMpesaPct: data.avgMpesaPct || 0,
+          revenueVariance: data.revenueVariance || 0
+        };
+      } catch (e) {
+        console.error('loadPaymentMix failed:', e);
+        this.paymentMix = { data: [], totalCash: 0, totalMpesa: 0, totalActualRevenue: 0, totalExpectedRevenue: 0, avgMpesaPct: 0, revenueVariance: 0 };
+      }
+    },
+
+    async loadExpenses() {
+      try {
+        const { data } = await api.get(`/reports/expense-breakdown`, {
+          params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
+        });
+        this.expenseData = {
+          data: data.data || [],
+          grandTotal: data.grandTotal || 0
+        };
+      } catch (e) {
+        console.error('loadExpenses failed:', e);
+        this.expenseData = { data: [], grandTotal: 0 };
+      }
+    },
+
+    // ===== FORMATTING HELPERS =====
+    formatCurrency(n) {
+      if (n === null || n === undefined || isNaN(n)) return 'Ksh 0';
+      return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(n);
+    },
+
+    formatCurrencyCompact(n) {
+      if (n === null || n === undefined || isNaN(n)) return '0';
+      const num = parseFloat(n);
+      if (Math.abs(num) >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toFixed(0);
+    },
+
+    formatNumber(n) {
+      if (n === null || n === undefined || isNaN(n)) return '0.00';
+      return parseFloat(n).toFixed(2);
+    },
+
+    formatDate(dateStr) {
+      if (!dateStr) return '—';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    },
+
+    formatDateShort(dateStr) {
+      if (!dateStr) return '—';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '—';
+      return d.getDate();
+    },
+
+    formatDay(dateStr) {
+      if (!dateStr) return '—';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('en-GB', { weekday: 'short' });
+    },
+
+    formatMargin(profit, revenue) {
+      const p = parseFloat(profit) || 0;
+      const r = parseFloat(revenue) || 0;
+      if (!r) return '—';
+      return ((p / r) * 100).toFixed(1) + '%';
+    },
+
+    // ===== COMPUTED HELPERS =====
+    getChangeClass(field) {
+      const val = parseFloat(this.comparative.changes[field]) || 0;
+      return val >= 0 ? 'up' : 'down';
+    },
+
+    getChangeIcon(field) {
+      const val = parseFloat(this.comparative.changes[field]) || 0;
+      return val >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+    },
+
+    getWasteChangeClass() {
+      const val = parseFloat(this.comparative.changes.waste) || 0;
+      // For waste, down is good (less waste)
+      return val <= 0 ? 'up' : 'down';
+    },
+
+    getWasteChangeIcon() {
+      const val = parseFloat(this.comparative.changes.waste) || 0;
+      return val <= 0 ? 'fas fa-arrow-down' : 'fas fa-arrow-up';
+    },
+
+    getAmountClass(n) {
+      const val = parseFloat(n) || 0;
+      return val >= 0 ? 'positive' : 'negative';
+    },
+
+    getMarginClass(day) {
+      const profit = parseFloat(day.avg_actual_profit || day.avg_profit) || 0;
+      return profit >= 0 ? 'positive' : 'negative';
+    },
+
+    getBarHeight(item) {
+      const profit = parseFloat(item.actual_profit || item.profit || 0);
+      if (this.maxProfit === 0) return 0;
+      return Math.min((Math.abs(profit) / this.maxProfit) * 100, 100);
+    },
+
+    getItemActualRevenue(item) {
+      const cash = parseFloat(item.payment_cash || item.paymentCash || 0);
+      const mpesa = parseFloat(item.payment_mpesa || item.paymentMpesa || 0);
+      if (cash > 0 || mpesa > 0) return cash + mpesa;
+      return parseFloat(item.actual_revenue || item.revenue || 0);
+    },
+
+    getItemMargin(item) {
+      const profit = parseFloat(item.actual_profit || item.profit || 0);
+      const revenue = parseFloat(item.actual_revenue || item.revenue || 0);
+      if (!revenue) return 0;
+      return (profit / revenue) * 100;
+    },
+
+    getWastePct(item) {
+      if (item.waste_pct !== undefined && item.waste_pct !== null) {
+        return parseFloat(item.waste_pct).toFixed(1);
+      }
+      const waste = parseFloat(item.waste_kg || item.wasteKg || 0);
+      const sold = parseFloat(item.sold_kg || item.soldKg || 0);
+      if (!sold && !waste) return '0.0';
+      return ((waste / (waste + sold)) * 100).toFixed(1);
+    },
+
+    getWasteClass(item) {
+      const pct = parseFloat(this.getWastePct(item)) || 0;
+      if (pct <= 2) return 'good';
+      if (pct <= 5) return 'warning';
+      return 'danger';
+    },
+
+    // ===== EXPORT =====
+    exportCSV() {
+      const headers = ['Date', 'Actual Revenue', 'Expected Revenue', 'Actual Profit', 'Expected Profit', 'Margin %', 'Sold kg', 'Waste %', 'Cash', 'M-Pesa'];
+      const rows = this.dailySummary.map(item => [
+        item.date,
+        item.actual_revenue || item.revenue || 0,
+        item.expected_revenue || item.revenue || 0,
+        item.actual_profit || item.profit || 0,
+        item.expected_profit || item.profit || 0,
+        this.getItemMargin(item).toFixed(1),
+        item.sold_kg || 0,
+        this.getWastePct(item),
+        item.payment_cash || item.paymentCash || 0,
+        item.payment_mpesa || item.paymentMpesa || 0
+      ]);
+
+      const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `meatpro-report-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  }
+};
 </script>
 
 <style scoped>
-/* Base Utilities */
-.cursor-pointer {
-    cursor: pointer;
+.reports-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  background: #f8f9fa;
+  min-height: 100vh;
 }
 
-.bg-grey-lighten-4 {
-    background-color: #f5f5f5 !important;
+/* Header */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.rounded-xl {
-    border-radius: 16px !important;
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.h-100 {
-    height: 100%;
+.back-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
 }
 
-.tracking-wide {
-    letter-spacing: 0.08em;
+.back-btn:hover { background: #f3f4f6; }
+
+.page-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+.subtitle {
+  color: #6b7280;
+  font-size: 13px;
+  margin: 4px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-::-webkit-scrollbar-track {
-    background: transparent;
+.header-right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
-::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
+.branch-select, .period-select {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+.refresh-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
 }
 
-/* Animations */
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
+.refresh-btn:hover { background: #f3f4f6; }
+.refresh-btn.spinning i { animation: spin 1s linear infinite; }
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Period Tabs */
+.period-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
-.reveal-card {
-    animation: fadeInUp 0.6s ease-out both;
+.tab-btn {
+  padding: 8px 18px;
+  border-radius: 20px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* Sidebar */
-.sidebar-modern {
-    border-right: 1px solid #f0f0f0 !important;
+.tab-btn.active {
+  background: #ef4444;
+  color: white;
+  border-color: #ef4444;
 }
 
-.nav-item-modern {
-    transition: all 0.25s ease;
-    margin-bottom: 4px;
+.tab-btn:hover:not(.active) { background: #f3f4f6; }
+
+/* Loading */
+.loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px;
+  gap: 16px;
 }
 
-.nav-item-modern:hover {
-    background-color: #fafafa;
-    transform: translateX(4px);
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #ef4444;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
-/* Main & Header */
-.main-modern {
-    scroll-behavior: smooth;
+/* Cards Grid */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.sticky-header {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: rgba(245, 245, 245, 0.95);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border-bottom: 1px solid transparent;
-    transition: all 0.3s ease;
-    /* Prevent ghosting/black bars during scroll */
-    backface-visibility: hidden;
-    transform: translateZ(0);
+.metric-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
 }
 
-@media (max-width: 599px) {
-    .sticky-header {
-        /* Backdrop filter is extremely expensive on mobile GPUs and causes scroll lag/black screens */
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        background: #f5f5f5 !important;
-        border-bottom: 1px solid #eeeeee;
-    }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
-.sticky-header.scrolled {
-    background: rgba(255, 255, 255, 0.95);
-    border-bottom-color: #f0f0f0;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+.icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
 }
 
-/* Period Chips */
-.period-chips-modern ::v-deep .v-slide-group__content {
-    gap: 8px;
+.revenue .icon-wrap { background: #fef2f2; color: #ef4444; }
+.profit .icon-wrap { background: #f0fdf4; color: #22c55e; }
+.volume .icon-wrap { background: #eff6ff; color: #3b82f6; }
+.waste .icon-wrap { background: #fefce8; color: #eab308; }
+
+.change-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.period-chips-modern ::v-deep .v-chip {
-    transition: all 0.25s ease;
+.change-badge.up { background: #f0fdf4; color: #16a34a; }
+.change-badge.down { background: #fef2f2; color: #dc2626; }
+.change-badge.neutral { background: #f3f4f6; color: #9ca3af; }
+
+.card-body h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 8px;
 }
 
-.period-chips-modern ::v-deep .v-chip:hover {
-    transform: translateY(-1px);
+.amount {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 4px;
 }
 
-/* KPI Cards */
-.kpi-card-modern {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid #f5f5f5;
+.amount.positive { color: #16a34a; }
+.amount.negative { color: #dc2626; }
+
+.vs-text {
+  font-size: 12px;
+  color: #9ca3af;
+  margin: 0;
 }
 
-.kpi-card-modern:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08) !important;
-    border-color: #eeeeee;
+.sub-note {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed #e5e7eb;
 }
 
-.kpi-avatar {
-    transition: all 0.3s ease;
+/* Variance Alert */
+.variance-alert {
+  display: flex;
+  gap: 16px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  align-items: flex-start;
 }
 
-.kpi-card-modern:hover .kpi-avatar {
-    transform: scale(1.05);
+.variance-alert.warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
 }
 
-/* Card Headers */
-.card-header-modern {
-    background: linear-gradient(to bottom, #ffffff, #fafafa);
+.variance-alert.info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
 }
 
-/* Chart */
-.chart-container-modern {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    height: 200px;
-    padding: 0 8px;
-    gap: 6px;
-    overflow-x: auto;
+.alert-icon {
+  font-size: 24px;
+  flex-shrink: 0;
 }
 
-.chart-bar-wrapper-modern {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-width: 32px;
+.variance-alert.warning .alert-icon { color: #f97316; }
+.variance-alert.info .alert-icon { color: #3b82f6; }
+
+.alert-content h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.chart-bar-container-modern {
-    width: 100%;
-    height: 160px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    position: relative;
+.alert-content p {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
 }
 
-.chart-bar-modern {
-    width: 70%;
-    border-radius: 6px 6px 0 0;
-    transition: height 0.4s ease;
-    min-height: 4px;
+.alert-content strong { color: #111827; }
+
+/* Charts Row */
+.charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
-.chart-label-modern {
-    font-size: 10px;
-    white-space: nowrap;
+@media (max-width: 900px) {
+  .charts-row { grid-template-columns: 1fr; }
 }
 
-.chart-value-modern {
-    font-size: 10px;
-    white-space: nowrap;
-    margin-top: 2px;
+.chart-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
 }
 
-/* Tables */
-.best-days-table-modern tbody tr,
-.waste-table-modern tbody tr,
-.payment-table-modern tbody tr,
-.summary-table-modern tbody tr,
-.expense-table-modern tbody tr {
-    transition: background-color 0.2s ease;
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
 }
 
-.best-days-table-modern tbody tr:hover,
-.waste-table-modern tbody tr:hover,
-.payment-table-modern tbody tr:hover,
-.summary-table-modern tbody tr:hover,
-.expense-table-modern tbody tr:hover {
-    background-color: #fafafa;
+.chart-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.row-modern {
-    transition: background-color 0.2s ease;
+.chart-header h3 i { color: #ef4444; }
+
+.chart-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #9ca3af;
 }
 
-/* Progress Bars */
-.progress-modern {
-    border-radius: 10px !important;
+.chart-badge {
+  padding: 4px 12px;
+  background: #f3f4f6;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
 }
 
-.progress-modern ::v-deep .v-progress-linear__determinate {
-    border-radius: 10px !important;
+/* Bar Chart */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px;
+  height: 200px;
+  padding: 20px 0;
 }
 
-/* Expense Items */
-.expense-item-modern {
-    transition: all 0.2s ease;
-    padding: 4px;
-    border-radius: 8px;
+.bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 80px;
 }
 
-.expense-item-modern:hover {
-    background-color: #fafafa;
+.bar-label {
+  font-size: 12px;
+  color: #9ca3af;
+  font-weight: 500;
 }
 
-/* Bottom Nav */
-.bottom-nav-modern {
-    border-radius: 20px 20px 0 0 !important;
-    overflow: hidden;
+.bar-track {
+  width: 40px;
+  height: 140px;
+  background: #f3f4f6;
+  border-radius: 8px 8px 4px 4px;
+  position: relative;
+  overflow: hidden;
 }
 
-/* Mobile Drawer */
-.mobile-drawer-modern {
-    background: white !important;
+.bar-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 8px 8px 4px 4px;
+  transition: height 0.5s ease;
 }
 
-/* Snackbar */
-.snackbar-modern ::v-deep .v-snackbar__content {
-    padding: 12px 20px;
+.bar-item.profit .bar-fill { background: #22c55e; }
+.bar-item.loss .bar-fill { background: #ef4444; }
+
+.bar-value {
+  font-size: 12px;
+  font-weight: 600;
 }
 
-/* Responsive */
-@media (max-width: 599px) {
-    .sticky-header {
-        padding-left: 12px;
-        padding-right: 12px;
-    }
+.bar-value.positive { color: #16a34a; }
+.bar-value.negative { color: #dc2626; }
 
-    .reveal-card {
-        animation-duration: 0.4s;
-    }
-
-    .kpi-card-modern {
-        padding: 16px !important;
-    }
-
-    .chart-container-modern {
-        height: 160px;
-        gap: 4px;
-    }
-
-    .chart-bar-container-modern {
-        height: 120px;
-    }
+.chart-legend {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #6b7280;
 }
 
-.cursor-pointer {
-    cursor: pointer;
+.dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 4px;
 }
 
-/* Branch Selector */
-.branch-select-modern ::v-deep .v-input__slot {
-  min-height: 36px !important;
+.dot.profit { background: #22c55e; }
+.dot.loss { background: #ef4444; }
+
+/* Best Days */
+.best-days-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
-.branch-select-modern ::v-deep .v-select__selections {
-  padding-top: 2px !important;
-  padding-bottom: 2px !important;
+
+.day-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 10px;
 }
+
+.day-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.day-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.day-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: #374151;
+}
+
+.day-metrics {
+  display: flex;
+  gap: 20px;
+}
+
+.metric {
+  text-align: right;
+}
+
+.metric-label {
+  display: block;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.metric-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.metric-value.positive { color: #16a34a; }
+.metric-value.negative { color: #dc2626; }
+
+/* Analytics Row */
+.analytics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .analytics-row { grid-template-columns: 1fr; }
+}
+
+.analytics-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
+}
+
+.card-header-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.card-header-flex h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-header-flex h3 i { color: #ef4444; }
+
+.card-subtitle {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.badge {
+  padding: 4px 12px;
+  background: #f0fdf4;
+  color: #16a34a;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.badge.mpesa { background: #f0fdf4; color: #059669; }
+
+.waste-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.waste-total span { font-size: 13px; color: #6b7280; }
+.waste-total strong { font-size: 18px; color: #ef4444; }
+
+/* Payment Donuts */
+.payment-donuts {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  padding: 20px 0;
+}
+
+.donut-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.donut {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.donut::before {
+  content: '';
+  width: 70px;
+  height: 70px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+}
+
+.donut-label {
+  position: relative;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.donut-name {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.donut-amount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.variance-mini {
+  text-align: center;
+  padding: 10px;
+  background: #fff7ed;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #c2410c;
+  margin-bottom: 12px;
+}
+
+.variance-mini i { margin-right: 6px; }
+
+/* Expense Card */
+.expense-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
+  margin-bottom: 20px;
+}
+
+.total-expense {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ef4444;
+}
+
+.expense-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+@media (max-width: 768px) {
+  .expense-grid { grid-template-columns: 1fr; }
+}
+
+.expense-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.expense-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.expense-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expense-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.expense-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: #374151;
+}
+
+.expense-count {
+  font-size: 11px;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.expense-bar-track {
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.expense-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.expense-amount {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  text-align: right;
+}
+
+/* Summary Card */
+.summary-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #f3f4f6;
+}
+
+.export-btn {
+  padding: 8px 16px;
+  background: #fef2f2;
+  color: #ef4444;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.export-btn:hover { background: #fee2e2; }
+
+/* Data Table */
+.data-table {
+  overflow-x: auto;
+}
+
+.data-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 12px;
+  color: #9ca3af;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.data-table td {
+  padding: 12px;
+  border-bottom: 1px solid #f9fafb;
+  color: #374151;
+}
+
+.data-table tbody tr:hover { background: #f9fafb; }
+
+.data-table.compact td { padding: 8px 12px; }
+
+.empty-cell {
+  text-align: center;
+  color: #9ca3af;
+  padding: 24px;
+}
+
+.date-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.date-day {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.date-full {
+  font-weight: 500;
+  color: #374151;
+}
+
+.chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chip.positive { background: #f0fdf4; color: #16a34a; }
+.chip.negative { background: #fef2f2; color: #dc2626; }
+
+.muted { color: #9ca3af; }
+
+.positive { color: #16a34a; }
+.negative { color: #dc2626; }
+
+.pct-badge {
+  padding: 2px 8px;
+  background: #f3f4f6;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.mpesa { color: #059669; }
+.cash { color: #3b82f6; }
+
+.waste-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.waste-badge.good { background: #f0fdf4; color: #16a34a; }
+.waste-badge.warning { background: #fef3c7; color: #d97706; }
+.waste-badge.danger { background: #fef2f2; color: #dc2626; }
+
+/* Expense Table */
+.expense-table-wrap {
+  border-left: 1px solid #f3f4f6;
+  padding-left: 24px;
+}
+
+.expense-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.expense-table th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #9ca3af;
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.expense-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f9fafb;
+}
+
+.dot-sm {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0 0;
+  margin-top: 12px;
+  border-top: 1px solid #f3f4f6;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.pagination select {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 13px;
+}
+
+.page-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.page-nav button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.page-nav button:hover:not(:disabled) { background: #f3f4f6; }
+.page-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #d1d5db;
+  gap: 12px;
+}
+
+.empty-state.small { padding: 20px; }
+
+.empty-state i { font-size: 40px; }
+.empty-state p { margin: 0; font-size: 14px; color: #9ca3af; }
 </style>

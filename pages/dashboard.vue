@@ -759,9 +759,19 @@
                     {{ item.sold_kg }} kg
                   </v-chip>
                 </template>
+                <template v-slot:item.actual_revenue="{ item }">
+                  <span class="font-weight-bold text-body-2 purple--text text--darken-2">{{
+                    formatNumber((parseFloat(item.payment_cash) || 0) + (parseFloat(item.payment_mpesa) || 0))
+                  }}</span>
+                </template>
                 <template v-slot:item.revenue="{ item }">
-                  <span class="font-weight-medium text-body-2 grey--text text--darken-2">{{
+                  <span class="font-weight-medium text-caption grey--text">{{
                     formatNumber(item.revenue)
+                  }}</span>
+                </template>
+                <template v-slot:item.total_cost="{ item }">
+                  <span class="text-body-2 grey--text">{{
+                    formatNumber((parseFloat(item.sold_kg) || 0) * (parseFloat(item.cost_per_kg) || 0))
                   }}</span>
                 </template>
                 <template v-slot:item.profit="{ item }">
@@ -942,10 +952,63 @@
             {{ isEditing ? 'Edit Entry' : 'Close Business Day' }}
           </v-toolbar-title>
           <v-spacer />
-          <v-chip dark outlined class="mr-3 hidden-xs-only" color="white">
-            <v-icon left small>mdi-calendar</v-icon>
-            {{ formattedSelectedDate }}
-          </v-chip>
+          <v-menu
+            v-model="dialogDateMenu"
+            :close-on-content-click="false"
+            transition="scale-transition"
+            offset-y
+            min-width="auto"
+          >
+            <template v-slot:activator="{ on, attrs }">
+              <v-chip
+                dark
+                outlined
+                class="mr-3 hidden-xs-only cursor-pointer"
+                color="white"
+                v-bind="attrs"
+                v-on="on"
+              >
+                <v-icon left small>mdi-calendar</v-icon>
+                {{ formattedSelectedDate }}
+              </v-chip>
+            </template>
+            <v-date-picker
+              v-model="searchDate2"
+              @input="onDialogDateChange"
+              :max="todayDate"
+              color="red darken-2"
+              header-color="red darken-2"
+              class="rounded-xl"
+            ></v-date-picker>
+          </v-menu>
+          <v-btn
+            icon
+            dark
+            class="hidden-sm-and-up mr-2"
+            @click="dialogDateMenu = true"
+          >
+            <v-icon small>mdi-calendar</v-icon>
+          </v-btn>
+          <v-dialog v-model="dialogDateMenu" fullscreen hide-overlay transition="dialog-bottom-transition" class="hidden-sm-and-up">
+            <v-card>
+              <v-toolbar dark color="red darken-2">
+                <v-btn icon dark @click="dialogDateMenu = false">
+                  <v-icon>mdi-close</v-icon>
+                </v-btn>
+                <v-toolbar-title>Select Date</v-toolbar-title>
+                <v-spacer></v-spacer>
+                <v-btn text dark @click="dialogDateMenu = false">Done</v-btn>
+              </v-toolbar>
+              <v-date-picker
+                v-model="searchDate2"
+                @input="onDialogDateChange"
+                :max="todayDate"
+                color="red darken-2"
+                header-color="red darken-2"
+                full-width
+              ></v-date-picker>
+            </v-card>
+          </v-dialog>
           <v-btn
             text
             dark
@@ -1509,6 +1572,7 @@ export default {
       shopName: 'Prime Cuts - CBD',
       branchId: 0,
       searchDate2: moment().format('YYYY-MM-DD'),
+      todayDate: moment().format('YYYY-MM-DD'),
       searchQuery: '',
       showForm: false,
       activeTab: 0,
@@ -1517,6 +1581,7 @@ export default {
       lastClosingStock: null,
       todayEntryTime: null,
       selectedBranch: null,
+      dialogDateMenu: false,
       stats: {
         last: { revenue: 0, cost: 0, margin: 0 },
         week: { revenue: 0, cost: 0, margin: 0 },
@@ -1548,9 +1613,8 @@ export default {
       headers: [
         { text: 'Date', value: 'date', width: '120' },
         { text: 'Sold', value: 'sold_kg', align: 'end' },
-        { text: 'Revenue', value: 'revenue', align: 'end' },
-        { text: 'Profit', value: 'profit', align: 'end' },
-        { text: 'Closing', value: 'closing_stock_kg', align: 'end' },
+        { text: 'Actual Revenue', value: 'actual_revenue', align: 'end' },
+        { text: 'Expected Revenue', value: 'revenue', align: 'end' },
         { text: '', value: 'actions', align: 'end', sortable: false, width: '40' },
       ],
       recentEntries: [],
@@ -1805,6 +1869,7 @@ export default {
       this.weekTrend = { revenue: 0 }
       this.resetForm()
     },
+// In your Vue component methods:
 
     checkPaymentInfo() {
       if (!this.mpesaReceipt) {
@@ -2056,6 +2121,18 @@ export default {
       this.showForm = false
       this.todayExpenses = []
       if (!this.isEditing) this.resetForm()
+    },
+
+    onDialogDateChange() {
+      this.dialogDateMenu = false
+      this.form.date = this.searchDate2
+      const entry = this.recentEntries.find((e) => e.date === this.searchDate2)
+      if (entry) {
+        this.populateForm(entry)
+      } else {
+        this.isEditing = false
+        this.resetForm()
+      }
     },
 
     calculateSold() {},
