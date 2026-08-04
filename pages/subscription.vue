@@ -34,7 +34,7 @@
     <!-- Main Content -->
     <v-main :class="nav_bars ? 'pb-16' : ''">
       <v-container :fluid="nav_bars" class="px-4 px-sm-6 pt-4 pt-sm-6">
-        
+
         <!-- Header -->
         <v-row align="center" class="mb-6">
           <v-col cols="12" sm="8">
@@ -52,16 +52,16 @@
                   <v-icon color="white" size="28">{{ currentSub.is_active ? 'mdi-crown' : 'mdi-alert' }}</v-icon>
                 </v-avatar>
                 <div>
-                  <div class="text-h6 font-weight-bold white--text">{{ currentSub.subscription.display_name || 'Starter' }}</div>
+                  <div class="text-h6 font-weight-bold white--text">{{ currentSub?.subscription?.display_name || 'Starter' }}</div>
                   <div class="text-caption white--text" style="opacity: 0.9;">
                     <span v-if="currentSub.is_active">
-                      Active until {{ formatDate(currentSub.subscription.end_date) }} 
-                      <v-chip x-small color="white" class="ml-2" :text-color="currentSub.days_remaining < 7 ? 'red' : 'green'">
-                        {{ currentSub.days_remaining }} days left
+                      Active until {{ formatDate(currentSub?.subscription?.end_date) }} 
+                      <v-chip x-small color="white" class="ml-2" :text-color="(currentSub?.days_remaining || 0) < 7 ? 'red' : 'green'">
+                        {{ currentSub?.days_remaining || 0 }} days left
                       </v-chip>
                     </span>
-                    <span v-else-if="currentSub.subscription.status === 'cancelled'">
-                      Cancelled — expires {{ formatDate(currentSub.subscription.end_date) }}
+                    <span v-else-if="currentSub?.subscription?.status === 'cancelled'">
+                      Cancelled — expires {{ formatDate(currentSub?.subscription?.end_date) }}
                     </span>
                     <span v-else>Your subscription has expired. Renew to unlock Pro features.</span>
                   </div>
@@ -72,7 +72,7 @@
                   <v-icon left>mdi-refresh</v-icon> Renew
                 </v-btn>
                 <!-- ONLY CHANGE: uses isPaidPlan instead of hardcoded 'pro' -->
-                <v-btn v-else-if="isPaidPlan(currentSub.subscription)" text color="white" class="rounded-xl text-capitalize" @click="cancelDialog = true">
+                <v-btn v-else-if="isPaidPlan(currentSub?.subscription)" text color="white" class="rounded-xl text-capitalize" @click="cancelDialog = true">
                   Cancel
                 </v-btn>
               </div>
@@ -86,7 +86,7 @@
             <v-card class="plan-card rounded-2xl h-100 pa-6 d-flex flex-column" 
               :class="{ 'plan-pro': plan.name === 'pro', 'plan-starter': plan.name === 'starter', 'elevation-8': isCurrentPlan(plan.name) }" 
               elevation="2">
-              
+
               <div class="d-flex align-center justify-space-between mb-4">
                 <v-chip :color="plan.name === 'pro' ? 'red darken-2' : 'grey lighten-2'" 
                   :text-color="plan.name === 'pro' ? 'white' : 'grey darken-2'" 
@@ -142,7 +142,7 @@
                 <v-icon left>{{ isCurrentPlan(plan.name) ? 'mdi-refresh' : 'mdi-crown-outline' }}</v-icon>
                 {{ isCurrentPlan(plan.name) ? 'Renew Plan' : `Upgrade to ${plan.display_name}` }}
               </v-btn>
-              
+
               <v-btn v-else block large outlined color="grey" class="rounded-xl text-capitalize" disabled>
                 <v-icon left>mdi-check</v-icon> Free Plan Active
               </v-btn>
@@ -247,7 +247,7 @@
           <v-icon left>mdi-send</v-icon>
           Pay with M-Pesa
         </v-btn>
-        
+
         <v-btn block text color="grey" class="text-capitalize" @click="paymentDialog = false">
           Cancel
         </v-btn>
@@ -297,7 +297,7 @@ import apiClient from '../services/api'
 
 export default {
   name: 'Subscription',
-  
+
   data() {
     return {
       timerEnabled: false,
@@ -309,32 +309,32 @@ export default {
       shopName: 'Prime Cuts - CBD',
       firebaseUid: null,
       demoMode: true,
-      
+
       plans: [],
       currentSub: null,
       payments: [],
-      
+
       paymentDialog: false,
       cancelDialog: false,
       selectedPlan: null,
       mpesaPhone: '254',
       payLoading: false,
       cancelLoading: false,
-      
+
       menuItems: [
         { title: 'Dashboard', icon: 'mdi-view-dashboard', to: '/dashboard' },
         { title: 'Reports', icon: 'mdi-chart-line', to: '/reports' },
         { title: 'Profile', icon: 'mdi-account', to: '/profile' },
         { title: 'Subscription', icon: 'mdi-crown', to: '/subscription' }
       ],
-      
+
       bottomItems: [
         { title: 'Home', icon: 'mdi-home', to: '/dashboard' },
         { title: 'Reports', icon: 'mdi-chart-line', to: '/reports' },
         { title: 'Profile', icon: 'mdi-account', to: '/profile' },
         { title: 'Pro', icon: 'mdi-crown', to: '/subscription' }
       ],
-      
+
       paymentHeaders: [
         { text: 'Date', value: 'created_at' },
         { text: 'Amount', value: 'amount', align: 'end' },
@@ -342,7 +342,7 @@ export default {
         { text: 'Receipt', value: 'mpesa_receipt' },
         { text: 'Status', value: 'status', align: 'center' }
       ],
-      
+
       snackbar: { show: false, text: '', color: 'success' },
       authUnsubscribe: null
     }
@@ -364,7 +364,7 @@ export default {
           }, 1000);
         } else if (value === 0 && this.timerEnabled) {
           this.StkQuery();
-          
+
         }
       },
       immediate: true,
@@ -376,13 +376,13 @@ export default {
       return this.currentSub.is_active ? 'gradient-active' : 'gradient-expired';
     }
   },
-  
+
   methods: {
     async StkQuery() {
       if (!this.CheckoutRequestID) return;
       this.timerCount = 25;
       this.timerEnabled = false;
-     
+
       this.showSnackbar('Checking payment status...', 'success');
 
       try {
@@ -393,8 +393,8 @@ export default {
         const details = response.data || {};
         const resultCode = response.data.result_code;
         const resultDesc = response.data.result_desc ;
-        
-       
+
+
 
         // this.showSuccess(response.data.ResultDesc || "Payment status received.");
         if (response.data.result_code === "0") {
@@ -422,7 +422,7 @@ export default {
         // INSUFFICIENT BALANCE
         if ( resultCode === "1") {
           this.showSnackbar( "Your M-Pesa balance is too low for this transaction.", "warning");
-        
+
           this.paymentDialog = false;
           return;
         }
@@ -473,7 +473,7 @@ export default {
     scrollToPlans() {
       document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' });
     },
-    
+
     async loadPlans() {
       try {
         const { data } = await apiClient.get('/plans');
@@ -481,7 +481,7 @@ export default {
         console.log('Loaded plans:', data);
       } catch (e) { console.error('Plans error', e); }
     },
-    
+
     async loadStatus() {
       if (!this.firebaseUid) return;
       try {
@@ -489,7 +489,7 @@ export default {
         this.currentSub = data;
       } catch (e) { console.error('Status error', e); }
     },
-    
+
     async loadPayments() {
       if (!this.firebaseUid) return;
       try {
@@ -500,19 +500,19 @@ export default {
         this.payments = [];
       }
     },
-    
+
     openPayment(plan) {
       this.selectedPlan = plan;
       this.mpesaPhone = '254';
       this.paymentDialog = true;
     },
-    
+
     async initiatePayment() {
       if (!/^254\d{9}$/.test(this.mpesaPhone)) {
         this.showSnackbar('Enter valid phone: 2547XXXXXXXX', 'warning');
         return;
       }
-      
+
       this.payLoading = true;
       try {
         const { data } = await apiClient.post('/subscriptions/initiate', {
@@ -521,22 +521,22 @@ export default {
           phone: this.mpesaPhone
         });
         this.CheckoutRequestID = data.checkout_request_id;
-       
+
           this.timerEnabled = true;
-        
+
         console.log('Payment initiated:', data);
 
           this.showSnackbar(data.message, 'success');
           // this.paymentDialog = false;
           this.payLoading = false;
 
-        
+
       } catch (error) {
         this.showSnackbar(error.response?.data?.message || 'Payment failed', 'error');
         this.payLoading = false;
       }
     },
-    
+
     async cancelSubscription() {
       this.cancelLoading = true;
       try {
@@ -550,7 +550,7 @@ export default {
         this.cancelLoading = false;
       }
     },
-    
+
     // ONLY ADDITION: determines if a plan is paid (shows cancel button)
     isPaidPlan(sub) {
       if (!sub) return false;
@@ -559,22 +559,22 @@ export default {
       const name = (sub.plan || sub.plan_name || '').toLowerCase();
       return !['starter', 'free', 'basic'].includes(name);
     },
-    
+
     showSnackbar(text, color = 'success') {
       this.snackbar = { show: true, text, color };
     },
-    
+
     onResize() { this.nav_bars = window.innerWidth < 768; },
     logout() {
       this.$fire.auth.signOut();
       this.$router.push('/login');
     }
   },
-  
+
   mounted() {
     this.onResize();
     window.addEventListener('resize', this.onResize);
-    
+
     this.$fire.auth.onAuthStateChanged(user => {
       if (user) {
         this.firebaseUid = user.uid;
@@ -586,7 +586,7 @@ export default {
       }
     });
   },
-  
+
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize);
   }
