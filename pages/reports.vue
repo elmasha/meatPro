@@ -3,13 +3,13 @@
     <!-- Header -->
     <div class="page-header">
       <div class="header-left">
-        <button class="back-btn" @click="$router.push('/dashboard')">
-          <i class="fas fa-arrow-left"></i>
-        </button>
+        <v-btn icon class="back-btn" @click="$router.push('/dashboard')">
+          <v-icon class="mr-2">mdi-arrow-left</v-icon>
+        </v-btn>
         <div>
           <h1>Analytics & Reports</h1>
           <p class="subtitle">
-            <i class="far fa-calendar-alt"></i>
+            <v-icon small class="mr-1">mdi-calendar</v-icon>
             {{ periodLabel }}
           </p>
         </div>
@@ -23,9 +23,9 @@
           <option value="30">30 Days</option>
           <option value="90">90 Days</option>
         </select>
-        <button class="refresh-btn" @click="loadAll" :class="{ spinning: loading }">
-          <i class="fas fa-sync-alt"></i>
-        </button>
+        <v-btn icon class="refresh-btn" @click="loadAll" :class="{ spinning: loading }">
+          <v-icon>mdi-refresh</v-icon>
+        </v-btn>
       </div>
     </div>
 
@@ -53,9 +53,9 @@
         <!-- Revenue Card -->
         <div class="metric-card revenue">
           <div class="card-header">
-            <div class="icon-wrap"><i class="fas fa-money-bill-wave"></i></div>
+            <div class="icon-wrap"><v-icon>mdi-cash-multiple</v-icon></div>
             <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('actual_revenue')">
-              <i :class="getChangeIcon('actual_revenue')"></i>
+              <v-icon small>{{ getChangeIcon('actual_revenue') }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.actual_revenue) || 0) }}%
             </span>
             <span v-else class="change-badge neutral">—</span>
@@ -73,9 +73,9 @@
         <!-- Net Profit Card -->
         <div class="metric-card profit">
           <div class="card-header">
-            <div class="icon-wrap"><i class="fas fa-chart-line"></i></div>
+            <div class="icon-wrap"><v-icon>mdi-chart-line</v-icon></div>
             <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('actual_profit')">
-              <i :class="getChangeIcon('actual_profit')"></i>
+              <v-icon small>{{ getChangeIcon('actual_profit') }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.actual_profit) || 0) }}%
             </span>
             <span v-else class="change-badge neutral">—</span>
@@ -95,9 +95,9 @@
         <!-- Volume Card -->
         <div class="metric-card volume">
           <div class="card-header">
-            <div class="icon-wrap"><i class="fas fa-weight-hanging"></i></div>
+            <div class="icon-wrap"><v-icon>mdi-weight-kilogram</v-icon></div>
             <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('sold')">
-              <i :class="getChangeIcon('sold')"></i>
+              <v-icon small>{{ getChangeIcon('sold') }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.sold) || 0) }}%
             </span>
             <span v-else class="change-badge neutral">—</span>
@@ -112,9 +112,9 @@
         <!-- Waste Card -->
         <div class="metric-card waste">
           <div class="card-header">
-            <div class="icon-wrap"><i class="fas fa-trash-alt"></i></div>
+            <div class="icon-wrap"><v-icon>mdi-delete-outline</v-icon></div>
             <span v-if="hasComparativeData" class="change-badge" :class="getWasteChangeClass()">
-              <i :class="getWasteChangeIcon()"></i>
+              <v-icon small>{{ getWasteChangeIcon() }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.waste) || 0) }}%
             </span>
             <span v-else class="change-badge neutral">—</span>
@@ -130,7 +130,7 @@
       <!-- ===== REVENUE VARIANCE ALERT ===== -->
       <div v-if="showVarianceAlert" class="variance-alert" :class="revenueVariance > 0 ? 'warning' : 'info'">
         <div class="alert-icon">
-          <i :class="revenueVariance > 0 ? 'fas fa-exclamation-triangle' : 'fas fa-info-circle'"></i>
+          <v-icon>{{ revenueVariance > 0 ? 'mdi-alert' : 'mdi-information' }}</v-icon>
         </div>
         <div class="alert-content">
           <h4>{{ revenueVariance > 0 ? 'Revenue Shortfall Detected' : 'Revenue Overcollection' }}</h4>
@@ -148,14 +148,14 @@
         <div class="chart-card">
           <div class="chart-header">
             <div>
-              <h3><i class="fas fa-chart-bar"></i> Profit Trend</h3>
+              <h3><v-icon left color="error">mdi-chart-bar</v-icon> Profit Trend</h3>
               <p class="chart-subtitle">Daily actual profit/loss (payments minus costs)</p>
             </div>
             <span class="chart-badge">Daily</span>
           </div>
           <div class="chart-body">
             <div v-if="!hasProfitTrend" class="empty-state">
-              <i class="fas fa-chart-bar"></i>
+              <v-icon large color="grey lighten-2">mdi-chart-bar</v-icon>
               <p>No data for selected period</p>
             </div>
             <div v-else class="bar-chart">
@@ -163,7 +163,7 @@
                 v-for="(item, i) in profitTrend" 
                 :key="i"
                 class="bar-item"
-                :class="(item.actual_profit || item.profit || 0) >= 0 ? 'profit' : 'loss'"
+                :class="getProfitTrendClass(item)"
               >
                 <div class="bar-label">{{ formatDateShort(item.date) }}</div>
                 <div class="bar-track">
@@ -172,8 +172,8 @@
                     :style="{ height: getBarHeight(item) + '%' }"
                   ></div>
                 </div>
-                <div class="bar-value" :class="(item.actual_profit || item.profit || 0) >= 0 ? 'positive' : 'negative'">
-                  {{ formatCurrencyCompact(item.actual_profit || item.profit) }}
+                <div class="bar-value" :class="getProfitTrendValueClass(item)">
+                  {{ formatCurrencyCompact(getProfitTrendValue(item)) }}
                 </div>
               </div>
             </div>
@@ -188,13 +188,13 @@
         <div class="chart-card">
           <div class="chart-header">
             <div>
-              <h3><i class="fas fa-calendar-check"></i> Best Days</h3>
+              <h3><v-icon left color="error">mdi-calendar-check</v-icon> Best Days</h3>
               <p class="chart-subtitle">Performance by day of week</p>
             </div>
           </div>
           <div class="chart-body">
             <div v-if="!hasDayOfWeek" class="empty-state">
-              <i class="fas fa-calendar"></i>
+              <v-icon large color="grey lighten-2">mdi-calendar</v-icon>
               <p>No data available</p>
             </div>
             <div v-else class="best-days-list">
@@ -231,7 +231,7 @@
         <div class="analytics-card">
           <div class="card-header-flex">
             <div>
-              <h3><i class="fas fa-trash-alt"></i> Waste Analysis</h3>
+              <h3><v-icon left color="error">mdi-delete-outline</v-icon> Waste Analysis</h3>
               <p class="card-subtitle">Cost of spoilage & trimmings</p>
             </div>
             <span class="badge">{{ wasteData.avgWastePct || 0 }}% avg</span>
@@ -269,7 +269,7 @@
         <div class="analytics-card">
           <div class="card-header-flex">
             <div>
-              <h3><i class="fas fa-credit-card"></i> Payment Mix</h3>
+              <h3><v-icon left color="error">mdi-credit-card-outline</v-icon> Payment Mix</h3>
               <p class="card-subtitle">M-Pesa vs Cash breakdown</p>
             </div>
             <span class="badge mpesa">{{ paymentMix.avgMpesaPct || 0 }}% M-Pesa</span>
@@ -291,7 +291,7 @@
             </div>
           </div>
           <div v-if="showPaymentVariance" class="variance-mini">
-            <i class="fas fa-exclamation-circle"></i>
+            <v-icon small color="orange darken-2">mdi-alert-circle</v-icon>
             Revenue variance: {{ formatCurrency(paymentMix.revenueVariance) }}
           </div>
           <div class="data-table compact">
@@ -324,7 +324,7 @@
       <div class="expense-card">
         <div class="card-header-flex">
           <div>
-            <h3><i class="fas fa-receipt"></i> Expense Breakdown</h3>
+            <h3><v-icon left color="error">mdi-receipt</v-icon> Expense Breakdown</h3>
             <p class="card-subtitle">Where your money goes</p>
           </div>
           <span class="total-expense">{{ formatCurrency(expenseData.grandTotal) }}</span>
@@ -379,12 +379,12 @@
       <div class="summary-card">
         <div class="card-header-flex">
           <div>
-            <h3><i class="fas fa-table"></i> Daily Summary</h3>
+            <h3><v-icon left color="error">mdi-table</v-icon> Daily Summary</h3>
             <p class="card-subtitle">Complete daily records ({{ dailySummary.length }} days)</p>
           </div>
-          <button class="export-btn" @click="exportCSV">
-            <i class="fas fa-download"></i> Export CSV
-          </button>
+          <v-btn text small color="error" class="export-btn" @click="exportCSV">
+            <v-icon left small>mdi-download</v-icon> Export CSV
+          </v-btn>
         </div>
         <div class="data-table">
           <table>
@@ -446,8 +446,12 @@
           </span>
           <span>{{ paginationText }}</span>
           <div class="page-nav">
-            <button :disabled="currentPage === 1" @click="currentPage--"><i class="fas fa-chevron-left"></i></button>
-            <button :disabled="currentPage >= totalPages" @click="currentPage++"><i class="fas fa-chevron-right"></i></button>
+            <v-btn icon x-small :disabled="currentPage === 1" @click="currentPage--">
+              <v-icon>mdi-chevron-left</v-icon>
+            </v-btn>
+            <v-btn icon x-small :disabled="currentPage >= totalPages" @click="currentPage++">
+              <v-icon>mdi-chevron-right</v-icon>
+            </v-btn>
           </div>
         </div>
       </div>
@@ -456,19 +460,18 @@
 </template>
 
 <script>
-import api from '@/services/api'; // Assuming you have an API service for axios
+import apiClient from '../services/api'
 
 export default {
   name: 'Reports',
   data() {
     return {
       loading: false,
-      selectedBranch: 1,
+      selectedBranch: null,
       selectedPeriod: '30',
-      branches: [
-        { id: 1, name: 'Grace cuts Kasa' },
-        { id: 2, name: 'Branch 2' }
-      ],
+      branches: [],
+      user: null,
+      userProfile: null,
 
       comparative: {
         thisMonth: { expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, sold: 0, avg_waste: 0, expenses: 0 },
@@ -591,12 +594,48 @@ export default {
   },
 
   mounted() {
-    this.loadAll();
+    this.initReports();
   },
 
   methods: {
+    async initReports() {
+      try {
+        const user = this.$fire?.auth?.currentUser;
+        if (user) {
+          this.user = user;
+          const { data } = await apiClient.get(`/users/${user.uid}/profile`);
+          this.userProfile = data;
+          if (data.branch_id) {
+            this.selectedBranch = data.branch_id;
+          }
+          await this.loadBranches();
+        }
+      } catch (e) {
+        console.error('Init error:', e);
+      }
+      this.loadAll();
+    },
+
+    async loadBranches() {
+      try {
+        if (!this.user?.uid) return;
+        const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`);
+        this.branches = data || [];
+        if (!this.selectedBranch && this.branches.length > 0) {
+          this.selectedBranch = this.branches[0].id;
+        }
+      } catch (e) {
+        console.error('Branches error:', e);
+      }
+    },
+
     async loadAll() {
+      if (!this.selectedBranch) {
+        console.warn('No branch selected, skipping report load');
+        return;
+      }
       this.loading = true;
+      console.log('Loading reports for branch:', this.selectedBranch, 'period:', this.selectedPeriod);
       try {
         await Promise.all([
           this.loadComparative(),
@@ -614,10 +653,10 @@ export default {
 
     async loadComparative() {
       try {
-        const { data } = await api.get(`/reports/comparative`, {
+        console.log('loadComparative: fetching...');
+        const { data } = await apiClient.get(`/reports/comparative`, {
           params: { branch_id: this.selectedBranch }
         });
-        // Defensive: ensure all nested objects exist
         this.comparative = {
           thisMonth: { 
             expected_revenue: 0, actual_revenue: 0, expected_profit: 0, actual_profit: 0, 
@@ -642,7 +681,8 @@ export default {
 
     async loadProfitability() {
       try {
-        const { data } = await api.get(`/reports/profitability`, {
+        console.log('loadProfitability: fetching...');
+        const { data } = await apiClient.get(`/reports/profitability`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
         this.profitTrend = data.daily || [];
@@ -659,7 +699,8 @@ export default {
 
     async loadWaste() {
       try {
-        const { data } = await api.get(`/reports/waste-analysis`, {
+        console.log('loadWaste: fetching...');
+        const { data } = await apiClient.get(`/reports/waste-analysis`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
         this.wasteData = {
@@ -675,7 +716,8 @@ export default {
 
     async loadPaymentMix() {
       try {
-        const { data } = await api.get(`/reports/payment-mix`, {
+        console.log('loadPaymentMix: fetching...');
+        const { data } = await apiClient.get(`/reports/payment-mix`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
         this.paymentMix = {
@@ -695,7 +737,8 @@ export default {
 
     async loadExpenses() {
       try {
-        const { data } = await api.get(`/reports/expense-breakdown`, {
+        console.log('loadExpenses: fetching...');
+        const { data } = await apiClient.get(`/reports/expense-breakdown`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
         this.expenseData = {
@@ -706,6 +749,21 @@ export default {
         console.error('loadExpenses failed:', e);
         this.expenseData = { data: [], grandTotal: 0 };
       }
+    },
+
+
+    getProfitTrendValue(item) {
+      return item.actual_profit !== undefined ? item.actual_profit : (item.profit || 0);
+    },
+
+    getProfitTrendClass(item) {
+      const val = this.getProfitTrendValue(item);
+      return val >= 0 ? 'profit' : 'loss';
+    },
+
+    getProfitTrendValueClass(item) {
+      const val = this.getProfitTrendValue(item);
+      return val >= 0 ? 'positive' : 'negative';
     },
 
     // ===== FORMATTING HELPERS =====
@@ -764,18 +822,17 @@ export default {
 
     getChangeIcon(field) {
       const val = parseFloat(this.comparative.changes[field]) || 0;
-      return val >= 0 ? 'fas fa-arrow-up' : 'fas fa-arrow-down';
+      return val >= 0 ? 'mdi-arrow-up' : 'mdi-arrow-down';
     },
 
     getWasteChangeClass() {
       const val = parseFloat(this.comparative.changes.waste) || 0;
-      // For waste, down is good (less waste)
       return val <= 0 ? 'up' : 'down';
     },
 
     getWasteChangeIcon() {
       const val = parseFloat(this.comparative.changes.waste) || 0;
-      return val <= 0 ? 'fas fa-arrow-down' : 'fas fa-arrow-up';
+      return val <= 0 ? 'mdi-arrow-down' : 'mdi-arrow-up';
     },
 
     getAmountClass(n) {
@@ -789,7 +846,7 @@ export default {
     },
 
     getBarHeight(item) {
-      const profit = parseFloat(item.actual_profit || item.profit || 0);
+      const profit = parseFloat(item.actual_profit !== undefined ? item.actual_profit : (item.profit || 0));
       if (this.maxProfit === 0) return 0;
       return Math.min((Math.abs(profit) / this.maxProfit) * 100, 100);
     },
@@ -798,11 +855,11 @@ export default {
       const cash = parseFloat(item.payment_cash || item.paymentCash || 0);
       const mpesa = parseFloat(item.payment_mpesa || item.paymentMpesa || 0);
       if (cash > 0 || mpesa > 0) return cash + mpesa;
-      return parseFloat(item.actual_revenue || item.revenue || 0);
+      return parseFloat(item.actual_revenue !== undefined ? item.actual_revenue : (item.revenue || 0));
     },
 
     getItemMargin(item) {
-      const profit = parseFloat(item.actual_profit || item.profit || 0);
+      const profit = parseFloat(item.actual_profit !== undefined ? item.actual_profit : (item.profit || 0));
       const revenue = parseFloat(item.actual_revenue || item.revenue || 0);
       if (!revenue) return 0;
       return (profit / revenue) * 100;
@@ -939,7 +996,7 @@ export default {
 }
 
 .refresh-btn:hover { background: #f3f4f6; }
-.refresh-btn.spinning i { animation: spin 1s linear infinite; }
+.refresh-btn.spinning .v-icon { animation: spin 1s linear infinite; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -1152,7 +1209,7 @@ export default {
   gap: 8px;
 }
 
-.chart-header h3 i { color: #ef4444; }
+.chart-header h3 .v-icon { color: #ef4444; }
 
 .chart-subtitle {
   margin: 4px 0 0;
@@ -1337,7 +1394,7 @@ export default {
   gap: 8px;
 }
 
-.card-header-flex h3 i { color: #ef4444; }
+.card-header-flex h3 .v-icon { color: #ef4444; }
 
 .card-subtitle {
   margin: 4px 0 0;
@@ -1431,7 +1488,7 @@ export default {
   margin-bottom: 12px;
 }
 
-.variance-mini i { margin-right: 6px; }
+.variance-mini .v-icon { margin-right: 6px; }
 
 /* Expense Card */
 .expense-card {
@@ -1528,21 +1585,10 @@ export default {
 }
 
 .export-btn {
-  padding: 8px 16px;
-  background: #fef2f2;
-  color: #ef4444;
-  border: none;
-  border-radius: 10px;
-  font-size: 13px;
+  text-transform: none;
   font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
+  font-size: 13px;
 }
-
-.export-btn:hover { background: #fee2e2; }
 
 /* Data Table */
 .data-table {
@@ -1695,21 +1741,11 @@ export default {
   gap: 8px;
 }
 
-.page-nav button {
+.page-nav .v-btn {
+  min-width: 32px !important;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: white;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
 }
-
-.page-nav button:hover:not(:disabled) { background: #f3f4f6; }
-.page-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Empty State */
 .empty-state {
@@ -1724,6 +1760,6 @@ export default {
 
 .empty-state.small { padding: 20px; }
 
-.empty-state i { font-size: 40px; }
+.empty-state .v-icon { font-size: 40px; }
 .empty-state p { margin: 0; font-size: 14px; color: #9ca3af; }
 </style>

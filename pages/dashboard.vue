@@ -985,23 +985,23 @@
             icon
             dark
             class="hidden-sm-and-up mr-2"
-            @click="dialogDateMenu = true"
+            @click="mobileDatePicker = true"
           >
             <v-icon small>mdi-calendar</v-icon>
           </v-btn>
-          <v-dialog v-model="dialogDateMenu" fullscreen hide-overlay transition="dialog-bottom-transition" class="hidden-sm-and-up">
+          <v-dialog v-model="mobileDatePicker" fullscreen hide-overlay transition="dialog-bottom-transition" class="hidden-sm-and-up">
             <v-card>
               <v-toolbar dark color="red darken-2">
-                <v-btn icon dark @click="dialogDateMenu = false">
+                <v-btn icon dark @click="mobileDatePicker = false">
                   <v-icon>mdi-close</v-icon>
                 </v-btn>
                 <v-toolbar-title>Select Date</v-toolbar-title>
                 <v-spacer></v-spacer>
-                <v-btn text dark @click="dialogDateMenu = false">Done</v-btn>
+                <v-btn text dark @click="mobileDatePicker = false">Done</v-btn>
               </v-toolbar>
               <v-date-picker
                 v-model="searchDate2"
-                @input="onDialogDateChange"
+                @input="onMobileDateChange"
                 :max="todayDate"
                 color="red darken-2"
                 header-color="red darken-2"
@@ -1582,6 +1582,7 @@ export default {
       todayEntryTime: null,
       selectedBranch: null,
       dialogDateMenu: false,
+      mobileDatePicker: false,
       stats: {
         last: { revenue: 0, cost: 0, margin: 0 },
         week: { revenue: 0, cost: 0, margin: 0 },
@@ -1615,6 +1616,8 @@ export default {
         { text: 'Sold', value: 'sold_kg', align: 'end' },
         { text: 'Actual Revenue', value: 'actual_revenue', align: 'end' },
         { text: 'Expected Revenue', value: 'revenue', align: 'end' },
+        { text: 'Profit', value: 'profit', align: 'end' },
+        { text: 'Total Cost', value: 'total_cost', align: 'end' },
         { text: '', value: 'actions', align: 'end', sortable: false, width: '40' },
       ],
       recentEntries: [],
@@ -1869,7 +1872,6 @@ export default {
       this.weekTrend = { revenue: 0 }
       this.resetForm()
     },
-// In your Vue component methods:
 
     checkPaymentInfo() {
       if (!this.mpesaReceipt) {
@@ -2115,6 +2117,8 @@ export default {
       if (!this.form.opening_stock_kg && this.lastClosingStock !== null && !this.isEditing) {
         this.form.opening_stock_kg = this.lastClosingStock
       }
+      // Load expenses for the date being opened
+      this.loadExpensesForDate(this.searchDate2)
     },
 
     closeDialog() {
@@ -2132,6 +2136,32 @@ export default {
       } else {
         this.isEditing = false
         this.resetForm()
+      }
+      // Load expenses for the selected date
+      this.loadExpensesForDate(this.searchDate2)
+    },
+
+    onMobileDateChange() {
+      this.mobileDatePicker = false
+      this.form.date = this.searchDate2
+      const entry = this.recentEntries.find((e) => e.date === this.searchDate2)
+      if (entry) {
+        this.populateForm(entry)
+      } else {
+        this.isEditing = false
+        this.resetForm()
+      }
+      // Load expenses for the selected date
+      this.loadExpensesForDate(this.searchDate2)
+    },
+
+    async loadExpensesForDate(date) {
+      try {
+        const expenseData = await this.apiCall('get', `/expenses/${date}?branch_id=${this.branchId}`)
+        this.todayExpenses = expenseData?.expenses || []
+      } catch (e) {
+        console.log('No expenses found for', date)
+        this.todayExpenses = []
       }
     },
 
