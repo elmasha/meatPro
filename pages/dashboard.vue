@@ -361,7 +361,7 @@
           <v-row v-if="todayStats.revenueVariance && Math.abs(todayStats.revenueVariance) > 1 && todayStats.revenue > 0" class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 150ms">
             <v-col cols="12">
               <v-alert
-                :type="todayStats.revenueVariance > 0 ? 'warning' : 'error'"
+                :type="todayStats.revenueVariance > 0 ? 'error' : 'success'"
                 dense
                 text
                 class="rounded-xl alert-modern"
@@ -370,9 +370,9 @@
                 elevation="2"
               >
                 <div class="d-flex align-center flex-wrap">
-                  <v-avatar :color="todayStats.revenueVariance > 0 ? 'orange lighten-5' : 'red lighten-5'" size="40" class="mr-3 hidden-xs-only">
-                    <v-icon :color="todayStats.revenueVariance > 0 ? 'orange darken-2' : 'red darken-2'">
-                      {{ todayStats.revenueVariance > 0 ? 'mdi-alert' : 'mdi-alert-circle' }}
+                  <v-avatar :color="todayStats.revenueVariance > 0 ? 'red lighten-5' : 'green lighten-5'" size="40" class="mr-3 hidden-xs-only">
+                    <v-icon :color="todayStats.revenueVariance > 0 ? 'red darken-2' : 'green darken-2'">
+                      {{ todayStats.revenueVariance > 0 ? 'mdi-alert-circle' : 'mdi-check-circle' }}
                     </v-icon>
                   </v-avatar>
                   <div class="flex-grow-1">
@@ -381,8 +381,8 @@
                     </div>
                     <div class="text-body-2 grey--text text--darken-1">
                       {{ todayStats.revenueVariance > 0 
-                        ? 'Expected revenue is higher than payments received. Check for unrecorded sales, theft, or pricing errors.' 
-                        : 'Payments received exceed expected revenue. Possible overpayment or data entry error.' }}
+                        ? 'Revenue shortfall: Expected revenue exceeds payments received. Check for unrecorded sales, theft, or pricing errors.' 
+                        : 'Revenue surplus: Great! You collected more than expected. This is normal for nyama choma (extras, tips, rounding).' }}
                     </div>
                   </div>
                   <div class="text-right hidden-xs-only">
@@ -1226,7 +1226,7 @@
                   v-if="Math.abs(expectedRevenue - ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0))) > 1"
                   dense
                   text
-                  :type="expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'warning' : 'error'"
+                  :type="expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'warning' : 'info'"
                   class="mt-4 rounded-xl"
                   border="left"
                   colored-border
@@ -1236,7 +1236,7 @@
                       Variance: KES {{ formatNumber(Math.abs(expectedRevenue - ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)))) }}
                     </span>
                     <span class="text-caption grey--text">
-                      {{ expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'Expected > Received' : 'Received > Expected' }}
+                      {{ expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'Expected > Received (shortfall)' : 'Received > Expected (surplus ✓)' }}
                     </span>
                   </div>
                 </v-alert>
@@ -1554,6 +1554,9 @@ export default {
 
   data() {
     return {
+      total_expenses: 0,
+      total_expenses7: 0,
+      total_expenses30: 0,
       // ── Subscription Gate ───────────────────────────────────────
       subLoading: true,
       subActive: false,
@@ -1610,6 +1613,8 @@ export default {
       },
       expenseForm: { title: '', amount: '' },
       todayExpenses: [],
+      sevenExpenses: [],
+      thirtyExpenses: [],
       expenseTypes: ['rent', 'shopping', 'gas', 'labour', 'charcoal', 'electricity', 'other'],
       headers: [
         { text: 'Date', value: 'date', width: '120' },
@@ -1699,7 +1704,10 @@ export default {
     },
     avgDailyRevenue() {
       if (!this.recentEntries.length) return 0
-      const total = this.recentEntries.reduce((sum, e) => sum + (parseFloat(e.revenue) || 0), 0)
+      const total = this.recentEntries.reduce((sum, e) => {
+        const actual = (parseFloat(e.payment_cash) || 0) + (parseFloat(e.payment_mpesa) || 0)
+        return sum + actual
+      }, 0)
       return total / this.recentEntries.length
     },
     filteredEntries() {
@@ -1925,9 +1933,13 @@ export default {
         // Load branch-specific stats only when a branch is chosen
         if (this.branchId) {
           await Promise.all([
+           
+            // console.log(`Previous 7 days: ${JSON.stringify(this.get7DaysBefore(moment(new Date()).format('YYYY-MM-DD')))}`),
             this.loadStats(),
             this.loadRecentEntries(),
             this.loadLastEntry(),
+             this.loadExpensesForDate7(this.get7DaysBefore(moment(new Date()).format('YYYY-MM-DD'))),
+            this.loadExpensesForDate30(this.get30DaysBefore(moment(new Date()).format('YYYY-MM-DD'))),
           ])
         }
       } catch (e) {
@@ -1936,7 +1948,12 @@ export default {
         this.loading = false
       }
     },
-
+get7DaysBefore(date) {
+  return moment(date).subtract(7, 'days').format('YYYY-MM-DD')
+},
+get30DaysBefore(date) {
+  return moment(date).subtract(30, 'days').format('YYYY-MM-DD')
+},
     async loadStats() {
       try {
         const [last, week, month] = await Promise.all([
@@ -1949,23 +1966,28 @@ export default {
           revenue: parseFloat(last.expectedRevenue) || parseFloat(last.totalRevenue) || 0,
           actualRevenue: parseFloat(last.actualRevenue) || parseFloat(last.totalRevenue) || 0,
           cost: parseFloat(last.totalCost) || 0,
-          margin: parseFloat(last.actualMargin) || parseFloat(last.netMargin) || 0,
+          expenses: parseFloat(last.totalExpenses) || 0,
+          margin: (parseFloat(last.actualRevenue) || 0) - (parseFloat(last.totalCost) || 0) - (parseFloat(last.totalExpenses) || 0),
           expectedMargin: parseFloat(last.expectedMargin) || 0,
           revenueVariance: parseFloat(last.revenueVariance) || 0,
           paymentCash: parseFloat(last.paymentCash) || 0,
           paymentMpesa: parseFloat(last.paymentMpesa) || 0,
         }
+
+        console.log('Stats loaded:', this.stats)
         this.stats.week = {
           revenue: week.totalRevenue || 0,
           actualRevenue: week.totalActualRevenue || week.totalRevenue || 0,
           cost: week.totalCost || 0,
-          margin: week.totalProfit || 0,
+          expenses: week.totalExpenses || 0,
+          margin: (week.totalActualRevenue || week.totalRevenue || 0) - (week.totalCost || 0) - (week.totalExpenses || 0),
         }
         this.stats.month = {
           revenue: month.totalRevenue || 0,
           actualRevenue: month.totalActualRevenue || month.totalRevenue || 0,
           cost: month.totalCost || 0,
-          margin: month.totalProfit || 0,
+          expenses: month.totalExpenses || 0,
+          margin: (month.totalActualRevenue || month.totalRevenue || 0) - (month.totalCost || 0) - (month.totalExpenses || 0),
         }
         this.weekTrend.revenue = (this.stats.last.actualRevenue || this.stats.last.revenue) - this.stats.week.revenue / 7
       } catch (e) {
@@ -2126,7 +2148,21 @@ export default {
       this.todayExpenses = []
       if (!this.isEditing) this.resetForm()
     },
-
+getPreviousNDays(endDate, n = 30) {
+  const end = moment(endDate)
+  const dates = []
+  
+  for (let i = n - 1; i >= 0; i--) {
+    dates.push(moment(end).subtract(i, 'days').format('YYYY-MM-DD'))
+  }
+  
+  return {
+    dates,
+    count: n,
+    startDate: dates[0],
+    endDate: dates[n - 1]
+  }
+},
     onDialogDateChange() {
       this.dialogDateMenu = false
       this.form.date = this.searchDate2
@@ -2159,9 +2195,40 @@ export default {
       try {
         const expenseData = await this.apiCall('get', `/expenses/${date}?branch_id=${this.branchId}`)
         this.todayExpenses = expenseData?.expenses || []
+        
+this.total_expenses = this.todayExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
+
+        console.log(`Expenses for ${date}:`, this.todayExpenses , "total:", this.total_expenses)
       } catch (e) {
         console.log('No expenses found for', date)
         this.todayExpenses = []
+      }
+    },
+
+    async loadExpensesForDate7(date) {
+      try {
+        const expenseData = await this.apiCall('get', `/expenses/${date}?branch_id=${this.branchId}`)
+        this.sevenExpenses = expenseData?.expenses || []
+        
+this.total_expenses7 = this.sevenExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
+
+        console.log(`Expenses for 7 ${date}:`, this.sevenExpenses , "total:", this.total_expenses7)
+      } catch (e) {
+        console.log('No expenses found for', date)
+        this.sevenExpenses = []
+      }
+    },
+    async loadExpensesForDate30(date) {
+      try {
+        const expenseData = await this.apiCall('get', `/expenses/${date}?branch_id=${this.branchId}`)
+        this.thirtyExpenses = expenseData?.expenses || []
+        
+this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
+
+        console.log(`Expenses for 30 ${date}:`, this.thirtyExpenses , "total:", this.total_expenses30)
+      } catch (e) {
+        console.log('No expenses found for', date)
+        this.thirtyExpenses = []
       }
     },
 

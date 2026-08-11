@@ -128,16 +128,16 @@
       </div>
 
       <!-- ===== REVENUE VARIANCE ALERT ===== -->
-      <div v-if="showVarianceAlert" class="variance-alert" :class="revenueVariance > 0 ? 'warning' : 'info'">
+      <div v-if="showVarianceAlert" class="variance-alert" :class="revenueVariance > 0 ? 'warning' : 'success'">
         <div class="alert-icon">
-          <v-icon>{{ revenueVariance > 0 ? 'mdi-alert' : 'mdi-information' }}</v-icon>
+          <v-icon>{{ revenueVariance > 0 ? 'mdi-alert' : 'mdi-check-circle' }}</v-icon>
         </div>
         <div class="alert-content">
-          <h4>{{ revenueVariance > 0 ? 'Revenue Shortfall Detected' : 'Revenue Overcollection' }}</h4>
+          <h4>{{ revenueVariance > 0 ? 'Revenue Shortfall Detected' : 'Revenue Surplus — Looking Good!' }}</h4>
           <p>
             Expected: {{ formatCurrency(comparative.thisMonth.expected_revenue) }} 
             | Actual: {{ formatCurrency(comparative.thisMonth.actual_revenue) }}
-            <strong>{{ revenueVariance > 0 ? 'Shortfall' : 'Excess' }}: {{ formatCurrency(Math.abs(revenueVariance)) }}</strong>
+            <strong>{{ revenueVariance > 0 ? 'Shortfall' : 'Surplus' }}: {{ formatCurrency(Math.abs(revenueVariance)) }}</strong>
           </p>
         </div>
       </div>
@@ -1151,6 +1151,11 @@ export default {
   border: 1px solid #bfdbfe;
 }
 
+.variance-alert.success {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+}
+
 .alert-icon {
   font-size: 24px;
   flex-shrink: 0;
@@ -1158,6 +1163,7 @@ export default {
 
 .variance-alert.warning .alert-icon { color: #f97316; }
 .variance-alert.info .alert-icon { color: #3b82f6; }
+.variance-alert.success .alert-icon { color: #22c55e; }
 
 .alert-content h4 {
   margin: 0 0 4px;
@@ -1481,11 +1487,19 @@ export default {
 .variance-mini {
   text-align: center;
   padding: 10px;
-  background: #fff7ed;
   border-radius: 8px;
   font-size: 12px;
-  color: #c2410c;
   margin-bottom: 12px;
+}
+
+.variance-mini.surplus {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.variance-mini.shortfall {
+  background: #fff7ed;
+  color: #c2410c;
 }
 
 .variance-mini .v-icon { margin-right: 6px; }
