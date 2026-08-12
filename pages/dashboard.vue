@@ -2392,9 +2392,22 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
     async submitConfirmed() {
       this.confirmDialog = false
       this.saving = true
+      console.log('💾 SUBMIT CONFIRMED called')
+
+      // ✅ FIX: Ensure branchId and date are never undefined
+      const branchId = this.branchId || this.userProfile?.branch_id || 0
+      const date = this.searchDate2 || moment().format('YYYY-MM-DD')
+
+      if (!branchId) {
+        console.error('❌ No branchId available')
+        this.showSnackbar('Error: No branch selected', 'error')
+        this.saving = false
+        return
+      }
+
       const payload = {
-        branch_id: this.branchId,
-        date: this.searchDate2,
+        branch_id: branchId,
+        date: date,
         opening_stock_kg: parseFloat(this.form.opening_stock_kg) || 0,
         supply_kg: parseFloat(this.form.supply_kg) || 0,
         waste_kg: parseFloat(this.form.waste_kg) || 0,
@@ -2404,30 +2417,40 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
         payment_cash: parseFloat(this.form.payment_cash) || 0,
         payment_mpesa: parseFloat(this.form.payment_mpesa) || 0,
       }
+      console.log('📤 Payload:', payload)
+
       try {
-        await this.apiCall('post', '/daily-operations', payload)
+        const response = await this.apiCall('post', '/daily-operations', payload)
+        console.log('✅ Daily operation saved:', response)
+
         if (this.todayExpenses.length > 0) {
+          console.log('💰 Saving', this.todayExpenses.length, 'expenses')
           await Promise.all(
             this.todayExpenses.map((exp) =>
               this.apiCall('post', '/expenses', {
-                branch_id: this.branchId,
+                branch_id: branchId,  // ✅ Use the safe branchId
                 title: exp.title,
                 amount: exp.amount,
-                date: this.searchDate2,
+                date: date,  // ✅ Use the safe date
               })
             )
           )
+          console.log('✅ Expenses saved')
         }
+
         this.showSnackbar(this.isEditing ? 'Day updated!' : 'Day closed successfully!', 'success')
         this.showForm = false
         this.todayExpenses = []
         this.isEditing = false
         this.resetForm()
         await this.refreshAll()
+        console.log('🔄 Refresh complete')
       } catch (e) {
-        console.error(e)
+        console.error('❌ SUBMIT ERROR:', e.message, e.response?.data)
+        this.showSnackbar('Error saving: ' + (e.response?.data?.message || e.message), 'error')
       } finally {
         this.saving = false
+        console.log('🏁 Saving finished')
       }
     },
     resetForm() {
