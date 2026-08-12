@@ -303,7 +303,7 @@
         <v-row dense class="mb-4 mb-sm-6">
           <v-col
             cols="6"
-            lg="3"
+            sm="3"
             v-for="(card, i) in kpiCards"
             :key="i"
             class="reveal-card"
@@ -313,25 +313,11 @@
               class="pa-4 pa-sm-5 rounded-xl h-100 kpi-card-modern"
               :class="card.bgClass"
               elevation="1"
-              :style="card.gradient ? `background: ${card.gradient}` : ''"
             >
               <div class="d-flex align-start justify-space-between mb-3">
                 <v-avatar :color="card.iconBg" size="44" class="elevation-1 kpi-avatar">
                   <v-icon :color="card.iconColor" size="22">{{ card.icon }}</v-icon>
                 </v-avatar>
-                <v-chip
-                  v-if="card.trend !== undefined"
-                  x-small
-                  :color="card.trend >= 0 ? 'green lighten-5' : 'red lighten-5'"
-                  :text-color="card.trend >= 0 ? 'green darken-2' : 'red darken-2'"
-                  class="font-weight-bold"
-                  label
-                >
-                  <v-icon x-small left>{{
-                    card.trend >= 0 ? 'mdi-trending-up' : 'mdi-trending-down'
-                  }}</v-icon>
-                  {{ Math.abs(card.trend) }}%
-                </v-chip>
               </div>
               <div
                 class="text-caption font-weight-bold text-uppercase mb-1 tracking-wide"
@@ -351,6 +337,96 @@
                 :class="card.subtitleColor || 'grey--text'"
               >
                 {{ card.subtitle }}
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <!-- Profit Breakdown Waterfall -->
+        <v-row dense class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 200ms">
+          <v-col cols="12">
+            <v-card class="rounded-xl pa-4 pa-sm-5" elevation="1">
+              <div class="d-flex align-center mb-4">
+                <v-avatar color="purple lighten-5" size="36" class="mr-3">
+                  <v-icon color="purple darken-2">mdi-chart-waterfall</v-icon>
+                </v-avatar>
+                <div>
+                  <div class="text-h6 font-weight-bold grey--text text--darken-2">
+                    Profit Breakdown
+                  </div>
+                  <div class="text-caption grey--text">How revenue becomes profit</div>
+                </div>
+              </div>
+
+              <!-- Waterfall Bars -->
+              <div class="waterfall-container">
+                <!-- Revenue Bar -->
+                <div class="waterfall-row">
+                  <div class="waterfall-label">
+                    <v-icon x-small color="green" class="mr-1">mdi-plus-circle</v-icon>
+                    Revenue
+                  </div>
+                  <div class="waterfall-bar-wrapper">
+                    <div class="waterfall-bar green-bar" :style="{ width: '100%' }">
+                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.revenue) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- COGS Bar -->
+                <div class="waterfall-row">
+                  <div class="waterfall-label">
+                    <v-icon x-small color="grey" class="mr-1">mdi-minus-circle</v-icon>
+                    COGS (Meat Cost)
+                  </div>
+                  <div class="waterfall-bar-wrapper">
+                    <div class="waterfall-bar grey-bar" :style="{ width: profitBreakdown.revenue > 0 ? Math.min((profitBreakdown.cogs / profitBreakdown.revenue) * 100, 100) + '%' : '0%' }">
+                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.cogs) }}</span>
+                    </div>
+                    <span class="waterfall-pct">{{ profitBreakdown.cogsPct }}%</span>
+                  </div>
+                </div>
+
+                <!-- Gross Profit -->
+                <div class="waterfall-row waterfall-subtotal">
+                  <div class="waterfall-label font-weight-bold">
+                    <v-icon x-small color="blue" class="mr-1">mdi-equal</v-icon>
+                    Gross Profit
+                  </div>
+                  <div class="waterfall-bar-wrapper">
+                    <div class="waterfall-bar blue-bar" :style="{ width: profitBreakdown.revenue > 0 ? Math.max((profitBreakdown.grossProfit / profitBreakdown.revenue) * 100, 0) + '%' : '0%' }">
+                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.grossProfit) }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Expenses Bar -->
+                <div class="waterfall-row">
+                  <div class="waterfall-label">
+                    <v-icon x-small color="orange" class="mr-1">mdi-minus-circle</v-icon>
+                    Operating Expenses
+                  </div>
+                  <div class="waterfall-bar-wrapper">
+                    <div class="waterfall-bar orange-bar" :style="{ width: profitBreakdown.revenue > 0 ? Math.min((profitBreakdown.expenses / profitBreakdown.revenue) * 100, 100) + '%' : '0%' }">
+                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.expenses) }}</span>
+                    </div>
+                    <span class="waterfall-pct">{{ profitBreakdown.expensesPct }}%</span>
+                  </div>
+                </div>
+
+                <!-- Net Profit -->
+                <div class="waterfall-row waterfall-total">
+                  <div class="waterfall-label font-weight-bold">
+                    <v-icon x-small :color="profitBreakdown.netProfit >= 0 ? 'green' : 'red'" class="mr-1">mdi-currency-usd</v-icon>
+                    Net Profit
+                  </div>
+                  <div class="waterfall-bar-wrapper">
+                    <div class="waterfall-bar" :class="profitBreakdown.netProfit >= 0 ? 'green-dark-bar' : 'red-bar'" :style="{ width: profitBreakdown.revenue > 0 ? Math.max((Math.abs(profitBreakdown.netProfit) / profitBreakdown.revenue) * 100, 0) + '%' : '0%' }">
+                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.netProfit) }}</span>
+                    </div>
+                    <span class="waterfall-pct font-weight-bold" :class="profitBreakdown.netProfit >= 0 ? 'green--text' : 'red--text'">{{ profitBreakdown.netMarginPct }}%</span>
+                  </div>
+                </div>
               </div>
             </v-card>
           </v-col>
@@ -529,7 +605,7 @@
                       <th
                         class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1"
                       >
-                        Cost
+                        Total Cost (Expenses)
                       </th>
                       <th
                         class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1"
@@ -1672,7 +1748,8 @@ export default {
       return this.volumeSold * (parseFloat(this.form.cost_per_kg) || 0)
     },
     expectedProfit() {
-      return this.expectedRevenue - this.expectedCost - this.todayExpenseTotal
+      // ✅ Option B: Net Profit = Revenue - Expenses only (COGS NOT subtracted)
+      return this.expectedRevenue - this.todayExpenseTotal
     },
     todayExpenseTotal() {
       return this.todayExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
@@ -1721,62 +1798,95 @@ export default {
       const revenueVariance = this.todayStats.revenueVariance || (expectedRevenue - actualRevenue)
       const hasVariance = Math.abs(revenueVariance) > 1 && expectedRevenue > 0
 
-      // Calculate real trend vs weekly average (using actual revenue)
-      let trendPct = 0
-      if (this.stats.week.revenue > 0 && (this.stats.last.actualRevenue || this.stats.last.revenue) > 0) {
-        const dailyAvg = this.stats.week.revenue / 7
-        trendPct = Math.round((((this.stats.last.actualRevenue || this.stats.last.revenue) - dailyAvg) / dailyAvg) * 100)
-      }
+      // ✅ Get today's expenses - prioritize todayStats which is loaded from the API
+      const todayExpenses = this.todayStats?.totalExpenses || this.total_expenses || 0
+      const cogs = this.todayStats?.cogs || this.expectedCost || 0
+      const netProfit = actualRevenue - todayExpenses  // Option B: Revenue - Expenses
+      const grossMargin = actualRevenue - cogs  // Revenue - COGS (for info)
+      const marginPct = actualRevenue > 0 ? ((netProfit / actualRevenue) * 100).toFixed(1) : 0
+
+      console.log('💳 kpiCards building:', {
+        total_expenses: this.total_expenses,
+        todayStats_totalExpenses: this.todayStats?.totalExpenses,
+        todayExpenses_array: this.todayExpenses.length,
+        todayExpenses: this.todayExpenses,
+        finalTodayExpenses: todayExpenses,
+        cogs: cogs,
+        netProfit: netProfit
+      })
 
       return [
         {
-          label: 'Expected Revenue',
-          value: this.formatNumber(expectedRevenue),
-          subtitle: 'Based on stock sold × price',
-          icon: 'mdi-calculator-variant',
+          label: 'Revenue',
+          value: this.formatNumber(actualRevenue),
+          subtitle: `Expected: ${this.formatNumber(expectedRevenue)}`,
+          icon: 'mdi-cash-register',
           iconBg: 'green lighten-5',
           iconColor: 'green darken-2',
-          trend: trendPct,
           bgClass: 'white',
           labelColor: 'grey--text',
           valueColor: 'grey--text text--darken-3',
+          fullWidth: false,
+        },
+        {
+          label: 'COGS (Meat)',
+          value: this.formatNumber(cogs),
+          subtitle: 'Cost of goods sold',
+          icon: 'mdi-food-steak',
+          iconBg: 'grey lighten-4',
+          iconColor: 'grey darken-2',
+          bgClass: 'white',
+          labelColor: 'grey--text',
+          valueColor: 'grey--text text--darken-2',
+          fullWidth: false,
+        },
+        {
+          label: 'Operating Expenses',
+          value: this.formatNumber(todayExpenses),
+          subtitle: 'Rent, labour, supplies',
+          icon: 'mdi-receipt-text-outline',
+          iconBg: 'orange lighten-5',
+          iconColor: 'orange darken-2',
+          bgClass: 'white',
+          labelColor: 'grey--text',
+          valueColor: 'orange--text text--darken-2',
+          fullWidth: false,
         },
         {
           label: 'Net Profit',
-          value: this.formatNumber(this.todayStats.profit),
-          subtitle: `${this.todayStats.marginPct}% margin (actual)`,
+          value: this.formatNumber(netProfit),
+          subtitle: `${marginPct}% margin · Revenue − Expenses`,
           icon: 'mdi-cash-multiple',
-          iconBg: this.todayStats.profit >= 0 ? 'green lighten-5' : 'red lighten-5',
-          iconColor: this.todayStats.profit >= 0 ? 'green darken-2' : 'red',
+          iconBg: netProfit >= 0 ? 'green lighten-5' : 'red lighten-5',
+          iconColor: netProfit >= 0 ? 'green darken-2' : 'red',
           bgClass: 'white',
           labelColor: 'grey--text',
-          valueColor: this.todayStats.profit >= 0 ? 'green--text text--darken-2' : 'red--text',
-        },
-        {
-          label: 'Payments Received',
-          value: this.formatNumber(actualRevenue),
-          subtitle: hasVariance
-            ? `⚠ Variance: ${this.formatNumber(Math.abs(revenueVariance))}`
-            : `${this.formatNumber(this.todayStats.mpesa)} M-Pesa · ${this.formatNumber(this.todayStats.cash)} cash`,
-          icon: 'mdi-wallet',
-          iconBg: hasVariance ? 'orange lighten-5' : 'purple lighten-5',
-          iconColor: hasVariance ? 'orange darken-2' : 'purple darken-2',
-          bgClass: 'white',
-          labelColor: 'grey--text',
-          valueColor: hasVariance ? 'orange--text text--darken-2' : 'grey--text text--darken-3',
-        },
-        {
-          label: 'Waste',
-          value: `${this.todayStats.wasteKg}kg`,
-          subtitle: this.wasteAlert ? 'Above 5% — check storage' : 'Within normal range',
-          icon: 'mdi-delete-variant',
-          iconBg: this.wasteAlert ? 'red lighten-5' : 'blue lighten-5',
-          iconColor: this.wasteAlert ? 'red' : 'blue darken-2',
-          bgClass: 'white',
-          labelColor: 'grey--text',
-          valueColor: this.wasteAlert ? 'red--text' : 'grey--text text--darken-3',
+          valueColor: netProfit >= 0 ? 'green--text text--darken-2' : 'red--text',
+          fullWidth: false,
         },
       ]
+    },
+
+    // New: Profit Breakdown Waterfall
+    profitBreakdown() {
+      const revenue = this.todayStats.actualRevenue || 
+        (this.todayStats.mpesa || 0) + (this.todayStats.cash || 0) ||
+        this.todayStats.revenue || 0
+      const cogs = this.todayStats?.cogs || this.expectedCost || 0
+      const expenses = this.todayStats?.totalExpenses || this.total_expenses || 0
+      const netProfit = revenue - expenses  // Option B
+      const grossProfit = revenue - cogs
+
+      return {
+        revenue,
+        cogs,
+        expenses,
+        grossProfit,
+        netProfit,
+        cogsPct: revenue > 0 ? ((cogs / revenue) * 100).toFixed(1) : 0,
+        expensesPct: revenue > 0 ? ((expenses / revenue) * 100).toFixed(1) : 0,
+        netMarginPct: revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : 0,
+      }
     },
     performanceRows() {
       return [
@@ -1785,7 +1895,8 @@ export default {
           icon: 'mdi-calendar-today',
           iconColor: 'grey',
           revenue: this.stats.last.actualRevenue || this.stats.last.revenue,
-          cost: this.stats.last.cost,
+          cost: this.stats.last.cost,           // ✅ TOTAL COST = expenses only
+          cogs: this.stats.last.cogs,           // COGS = meat cost
           margin: this.stats.last.margin,
         },
         {
@@ -1793,7 +1904,8 @@ export default {
           icon: 'mdi-calendar-week',
           iconColor: 'blue',
           revenue: this.stats.week.actualRevenue || this.stats.week.revenue,
-          cost: this.stats.week.cost,
+          cost: this.stats.week.cost,           // ✅ TOTAL COST = expenses only
+          cogs: this.stats.week.cogs,           // COGS = meat cost
           margin: this.stats.week.margin,
         },
         {
@@ -1801,7 +1913,8 @@ export default {
           icon: 'mdi-calendar-month',
           iconColor: 'red',
           revenue: this.stats.month.actualRevenue || this.stats.month.revenue,
-          cost: this.stats.month.cost,
+          cost: this.stats.month.cost,          // ✅ TOTAL COST = expenses only
+          cogs: this.stats.month.cogs,          // COGS = meat cost
           margin: this.stats.month.margin,
         },
       ]
@@ -1957,17 +2070,27 @@ get30DaysBefore(date) {
     async loadStats() {
       try {
         const [last, week, month] = await Promise.all([
-          this.apiCall('get', `/reports/last-entry?branch_id=${this.branchId}`),
+          this.apiCall('get', `/daily-operations/last?branch_id=${this.branchId}`),
           this.apiCall('get', `/reports/last-7-days?branch_id=${this.branchId}`),
           this.apiCall('get', `/reports/month-to-date?branch_id=${this.branchId}`),
         ])
-        // last-entry now returns expectedRevenue, actualRevenue, actualMargin, etc.
+
+        // Backend now returns:
+        //   totalCost = expenses only (from expenses table)
+        //   cogs / totalCogs = meat cost (sold_kg * cost_per_kg)
+        //   totalExpenses = same as totalCost
+
+        const lastActualRevenue = parseFloat(last.actualRevenue) || parseFloat(last.totalRevenue) || 0
+        const lastCogs = parseFloat(last.cogs) || parseFloat(last.totalCogs) || 0
+        const lastTotalCost = parseFloat(last.totalCost) || parseFloat(last.totalExpenses) || 0
+
         this.stats.last = {
           revenue: parseFloat(last.expectedRevenue) || parseFloat(last.totalRevenue) || 0,
-          actualRevenue: parseFloat(last.actualRevenue) || parseFloat(last.totalRevenue) || 0,
-          cost: parseFloat(last.totalCost) || 0,
-          expenses: parseFloat(last.totalExpenses) || 0,
-          margin: (parseFloat(last.actualRevenue) || 0) - (parseFloat(last.totalCost) || 0) - (parseFloat(last.totalExpenses) || 0),
+          actualRevenue: lastActualRevenue,
+          cost: lastTotalCost,              // ✅ TOTAL COST = expenses only
+          cogs: lastCogs,                   // COGS = meat cost (separate)
+          expenses: lastTotalCost,          // Same as cost, for clarity
+          margin: lastActualRevenue - lastTotalCost,  // ✅ Option B: Revenue - Expenses only  // Profit = Revenue - COGS - Expenses
           expectedMargin: parseFloat(last.expectedMargin) || 0,
           revenueVariance: parseFloat(last.revenueVariance) || 0,
           paymentCash: parseFloat(last.paymentCash) || 0,
@@ -1975,21 +2098,34 @@ get30DaysBefore(date) {
         }
 
         console.log('Stats loaded:', this.stats)
+
+        const weekRevenue = parseFloat(week.totalActualRevenue) || parseFloat(week.totalRevenue) || 0
+        const weekCogs = parseFloat(week.totalCogs) || 0
+        const weekCost = parseFloat(week.totalCost) || parseFloat(week.totalExpenses) || 0
+
         this.stats.week = {
-          revenue: week.totalRevenue || 0,
-          actualRevenue: week.totalActualRevenue || week.totalRevenue || 0,
-          cost: week.totalCost || 0,
-          expenses: week.totalExpenses || 0,
-          margin: (week.totalActualRevenue || week.totalRevenue || 0) - (week.totalCost || 0) - (week.totalExpenses || 0),
+          revenue: parseFloat(week.totalRevenue) || 0,
+          actualRevenue: weekRevenue,
+          cost: weekCost,                   // ✅ TOTAL COST = expenses only
+          cogs: weekCogs,                   // COGS = meat cost
+          expenses: weekCost,
+          margin: weekRevenue - weekCost,  // ✅ Option B: Revenue - Expenses only
         }
+
+        const monthRevenue = parseFloat(month.totalActualRevenue) || parseFloat(month.totalRevenue) || 0
+        const monthCogs = parseFloat(month.totalCogs) || 0
+        const monthCost = parseFloat(month.totalCost) || parseFloat(month.totalExpenses) || 0
+
         this.stats.month = {
-          revenue: month.totalRevenue || 0,
-          actualRevenue: month.totalActualRevenue || month.totalRevenue || 0,
-          cost: month.totalCost || 0,
-          expenses: month.totalExpenses || 0,
-          margin: (month.totalActualRevenue || month.totalRevenue || 0) - (month.totalCost || 0) - (month.totalExpenses || 0),
+          revenue: parseFloat(month.totalRevenue) || 0,
+          actualRevenue: monthRevenue,
+          cost: monthCost,                  // ✅ TOTAL COST = expenses only
+          cogs: monthCogs,                  // COGS = meat cost
+          expenses: monthCost,
+          margin: monthRevenue - monthCost,  // ✅ Option B: Revenue - Expenses only
         }
-        this.weekTrend.revenue = (this.stats.last.actualRevenue || this.stats.last.revenue) - this.stats.week.revenue / 7
+
+        this.weekTrend.revenue = (this.stats.last.actualRevenue || this.stats.last.revenue) - (this.stats.week.revenue / 7)
       } catch (e) {
         console.error('Stats error', e)
       }
@@ -2027,9 +2163,11 @@ get30DaysBefore(date) {
             const expenseData = await this.apiCall('get', `/expenses/${entry.date}?branch_id=${this.branchId}`)
             totalExpenses = expenseData?.totalPaid || 0
             this.todayExpenses = expenseData?.expenses || []
+            this.total_expenses = totalExpenses  // ✅ Sync with kpiCards
           } catch (expError) {
             console.log('No expenses found for this date')
             this.todayExpenses = []
+            this.total_expenses = 0
           }
 
           // ===== REVENUE BREAKDOWN =====
@@ -2039,10 +2177,10 @@ get30DaysBefore(date) {
           const actualRevenue = paymentCash + paymentMpesa                // Total payments received
           const cogs = (parseFloat(entry.sold_kg) || 0) * (parseFloat(entry.cost_per_kg) || 0)
 
-          // Real profit = actual payments − COGS − expenses
-          const actualProfit = actualRevenue - cogs - totalExpenses
-          // Expected profit = expected revenue − COGS − expenses
-          const expectedProfit = expectedRevenue - cogs - totalExpenses
+          // ✅ Option B: Real profit = actual payments − expenses only (COGS NOT subtracted)
+          const actualProfit = actualRevenue - totalExpenses
+          // ✅ Option B: Expected profit = expected revenue − expenses only (COGS NOT subtracted)
+          const expectedProfit = expectedRevenue - totalExpenses
           const revenueVariance = expectedRevenue - actualRevenue
 
           this.todayStats = {
@@ -2574,6 +2712,69 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 }
 
 /* Responsive */
+/* Waterfall Chart */
+.waterfall-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.waterfall-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+}
+.waterfall-row.waterfall-subtotal {
+  border-top: 1px dashed #e0e0e0;
+  border-bottom: 1px dashed #e0e0e0;
+  margin: 4px 0;
+  padding: 10px 0;
+}
+.waterfall-row.waterfall-total {
+  border-top: 2px solid #e0e0e0;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+.waterfall-label {
+  width: 160px;
+  font-size: 13px;
+  color: #616161;
+  display: flex;
+  align-items: center;
+}
+.waterfall-bar-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.waterfall-bar {
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  min-width: 60px;
+  transition: width 0.6s ease;
+}
+.waterfall-value {
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.waterfall-pct {
+  font-size: 12px;
+  color: #9e9e9e;
+  min-width: 40px;
+}
+.green-bar { background: linear-gradient(90deg, #43a047, #66bb6a); }
+.grey-bar { background: linear-gradient(90deg, #757575, #9e9e9e); }
+.blue-bar { background: linear-gradient(90deg, #1976d2, #42a5f5); }
+.orange-bar { background: linear-gradient(90deg, #f57c00, #ffa726); }
+.green-dark-bar { background: linear-gradient(90deg, #2e7d32, #43a047); }
+.red-bar { background: linear-gradient(90deg, #c62828, #ef5350); }
+
 @media (max-width: 599px) {
   .sticky-header {
     padding-left: 12px;
@@ -2602,6 +2803,14 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 
   .dialog-content-modern {
     padding: 16px !important;
+  }
+
+  .waterfall-label {
+    width: 120px;
+    font-size: 11px;
+  }
+  .waterfall-value {
+    font-size: 11px;
   }
 }
 </style>
