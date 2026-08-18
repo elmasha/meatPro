@@ -8,10 +8,10 @@
       <div class="noise-overlay"></div>
     </div>
 
-    <v-container class="fill-height d-flex align-center justify-center relative z-10">
+    <v-container class="fill-height d-flex align-center justify-center relative z-10 py-8">
       <v-row justify="center">
-        <v-col cols="12" sm="8" md="6" lg="5">
-          
+        <v-col cols="12" sm="10" md="8" lg="6">
+
           <!-- Header -->
           <div class="text-center mb-8 logo-reveal">
             <div class="logo-glow mb-4 d-inline-block">
@@ -19,22 +19,202 @@
                 <v-icon color="white" size="32">mdi-food-steak</v-icon>
               </v-avatar>
             </div>
-            <h1 class="text-h4 font-weight-black white--text tracking-tight">Add Your Branch</h1>
-            <p class="text-subtitle-2 grey--text text--lighten-1 mt-2">Set up your shop location</p>
+            <h1 class="text-h4 font-weight-black white--text tracking-tight">Manage Branches</h1>
+            <p class="text-subtitle-2 grey--text text--lighten-1 mt-2">
+              {{ planLabel }} · {{ branches.length }} of {{ branchLimitLabel }} used
+            </p>
           </div>
 
-          <!-- Glass Card -->
-          <v-card class="glass-card rounded-3xl overflow-hidden" elevation="0">
-            <div class="pa-6 pa-sm-8">
-              <div class="d-flex align-center mb-6">
-                <v-avatar color="red darken-2" size="40" class="mr-3">
-                  <v-icon color="white">mdi-map-marker</v-icon>
+          <!-- Plan / Slots Card -->
+          <v-card class="glass-card rounded-3xl overflow-hidden mb-5" elevation="0">
+            <div class="pa-5 pa-sm-6">
+              <div class="d-flex align-center justify-space-between flex-wrap">
+                <div class="d-flex align-center mb-2 mb-sm-0">
+                  <v-avatar :color="planColor" size="40" class="mr-3">
+                    <v-icon color="white" small>mdi-crown</v-icon>
+                  </v-avatar>
+                  <div>
+                    <div class="text-body-1 font-weight-bold white--text">{{ planDisplayName }} Plan</div>
+                    <div class="text-caption grey--text">
+                      {{ remainingSlots === Infinity ? 'Unlimited branches' : `${remainingSlots} slot${remainingSlots === 1 ? '' : 's'} remaining` }}
+                    </div>
+                  </div>
+                </div>
+                <v-chip
+                  small
+                  :color="atLimit ? 'orange darken-2' : 'green darken-2'"
+                  dark
+                  label
+                  class="font-weight-bold"
+                >
+                  {{ atLimit ? 'Limit Reached' : `${branches.length}/${branchLimitLabel}` }}
+                </v-chip>
+              </div>
+
+              <!-- Progress bar for limited plans -->
+              <v-progress-linear
+                v-if="branchLimit !== Infinity"
+                :value="(branches.length / branchLimit) * 100"
+                :color="atLimit ? 'orange' : 'red darken-2'"
+                background-color="rgba(255,255,255,0.08)"
+                height="6"
+                rounded
+                class="mt-4"
+              />
+            </div>
+          </v-card>
+
+          <!-- Existing Branches List -->
+          <v-card class="glass-card rounded-3xl overflow-hidden mb-5" elevation="0">
+            <div class="pa-5 pa-sm-6">
+              <div class="d-flex align-center mb-4">
+                <v-avatar color="blue darken-2" size="36" class="mr-3">
+                  <v-icon color="white" small>mdi-store</v-icon>
                 </v-avatar>
                 <div>
-                  <h2 class="text-h6 font-weight-bold white--text">Branch Details</h2>
-                  <p class="text-caption grey--text">Where is your shop located?</p>
+                  <h2 class="text-h6 font-weight-bold white--text">Your Branches</h2>
+                  <p class="text-caption grey--text">Tap a branch to set it as primary</p>
                 </div>
               </div>
+
+              <div v-if="!profileLoaded" class="text-center py-6">
+                <v-progress-circular indeterminate color="red" size="32" />
+                <div class="text-caption grey--text mt-3">Loading branches…</div>
+              </div>
+
+              <div v-else-if="branches.length === 0" class="text-center py-6">
+                <v-icon size="48" color="grey darken-1">mdi-store-off</v-icon>
+                <div class="text-body-1 grey--text mt-3">No branches yet</div>
+                <div class="text-caption grey--text">Create your first branch below</div>
+              </div>
+
+              <div v-else class="branch-list">
+                <div
+                  v-for="b in branches"
+                  :key="b.id"
+                  class="branch-item"
+                  :class="{ 'branch-primary': b.id === primaryBranchId, 'branch-selecting': selectingId === b.id }"
+                  @click="setPrimaryBranch(b)"
+                >
+                  <div class="d-flex align-center">
+                    <v-avatar
+                      :color="b.id === primaryBranchId ? 'red darken-2' : 'rgba(255,255,255,0.08)'"
+                      size="42"
+                      class="mr-3"
+                    >
+                      <v-icon :color="b.id === primaryBranchId ? 'white' : 'grey lighten-1'" small>
+                        {{ b.id === primaryBranchId ? 'mdi-star' : 'mdi-store' }}
+                      </v-icon>
+                    </v-avatar>
+                    <div class="flex-grow-1 min-width-0">
+                      <div class="d-flex align-center">
+                        <span class="text-body-1 font-weight-bold white--text text-truncate">{{ b.name }}</span>
+                        <v-chip
+                          v-if="b.id === primaryBranchId"
+                          x-small
+                          color="red darken-2"
+                          dark
+                          label
+                          class="ml-2 font-weight-bold"
+                        >
+                          Primary
+                        </v-chip>
+                      </div>
+                      <div class="text-caption grey--text text-truncate">
+                        <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
+                        {{ b.location || 'No location' }}
+                      </div>
+                    </div>
+                    <v-progress-circular
+                      v-if="selectingId === b.id"
+                      indeterminate
+                      size="20"
+                      width="2"
+                      color="red"
+                      class="ml-2"
+                    />
+                    <v-icon
+                      v-else-if="b.id === primaryBranchId"
+                      color="red lighten-2"
+                      small
+                      class="ml-2"
+                    >
+                      mdi-check-circle
+                    </v-icon>
+                    <v-icon v-else color="grey darken-1" small class="ml-2">
+                      mdi-chevron-right
+                    </v-icon>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </v-card>
+
+          <!-- Create Branch Form -->
+          <v-card class="glass-card rounded-3xl overflow-hidden" elevation="0">
+            <div class="pa-5 pa-sm-6">
+              <div class="d-flex align-center mb-5">
+                <v-avatar color="red darken-2" size="36" class="mr-3">
+                  <v-icon color="white" small>mdi-store-plus</v-icon>
+                </v-avatar>
+                <div>
+                  <h2 class="text-h6 font-weight-bold white--text">Add New Branch</h2>
+                  <p class="text-caption grey--text">
+                    {{ atLimit ? 'Upgrade your plan to add more branches' : 'Where is your next shop?' }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- At limit warning -->
+              <v-alert
+                v-if="profileLoaded && atLimit"
+                type="warning"
+                text
+                dense
+                class="mb-4 rounded-xl"
+                color="orange"
+              >
+                <div class="d-flex align-center flex-wrap">
+                  <span>You've reached the {{ planDisplayName }} limit of {{ branchLimit }} branch{{ branchLimit === 1 ? '' : 'es' }}.</span>
+                  <v-btn
+                    v-if="planName !== 'business'"
+                    text
+                    small
+                    color="orange"
+                    class="ml-2 text-capitalize"
+                    @click="$router.push('/subscription')"
+                  >
+                    Upgrade Plan
+                  </v-btn>
+                </div>
+              </v-alert>
+
+              <!-- Not Pro warning -->
+              <v-alert
+                v-if="profileLoaded && !isPro && planName === 'free'"
+                type="warning"
+                text
+                dense
+                class="mb-4 rounded-xl"
+                color="orange"
+              >
+                Branch creation requires an active subscription.
+                <v-btn text small color="orange" class="ml-2 text-capitalize" @click="$router.push('/subscription')">
+                  Subscribe
+                </v-btn>
+              </v-alert>
+
+              <!-- No business warning -->
+              <v-alert
+                v-if="profileLoaded && isPro && !businessId"
+                type="warning"
+                text
+                dense
+                class="mb-4 rounded-xl"
+                color="orange"
+              >
+                No business found. Please create a business first.
+              </v-alert>
 
               <v-text-field
                 v-model="branch.name"
@@ -47,7 +227,7 @@
                 class="modern-input rounded-xl mb-4"
                 prepend-inner-icon="mdi-source-branch"
                 :rules="[v => !!v || 'Required']"
-                :disabled="!isPro"
+                :disabled="!canCreate"
               />
               <v-text-field
                 v-model="branch.location"
@@ -57,10 +237,10 @@
                 dark
                 color="red"
                 background-color="rgba(255,255,255,0.03)"
-                class="modern-input rounded-xl mb-6"
+                class="modern-input rounded-xl mb-5"
                 prepend-inner-icon="mdi-map-marker"
                 :rules="[v => !!v || 'Required']"
-                :disabled="!isPro"
+                :disabled="!canCreate"
               />
 
               <v-btn
@@ -70,43 +250,34 @@
                 dark
                 class="rounded-xl text-capitalize font-weight-bold elevation-4 hover-lift"
                 :loading="loading"
-                :disabled="!isPro || !businessId"
+                :disabled="!canCreate || !branch.name || !branch.location"
                 @click="createBranch"
               >
-                Create Branch
-                <v-icon right>mdi-check-circle</v-icon>
+                {{ atLimit ? 'Limit Reached' : 'Create Branch' }}
+                <v-icon right>{{ atLimit ? 'mdi-lock' : 'mdi-check-circle' }}</v-icon>
               </v-btn>
-
-              <v-alert
-                v-if="profileLoaded && !isPro"
-                type="warning"
-                text
-                dense
-                class="mt-4 rounded-xl"
-                color="orange"
-              >
-                Branch creation requires a Pro subscription.
-                <v-btn text small color="orange" class="ml-2" @click="$router.push('/subscription')">
-                  Upgrade
-                </v-btn>
-              </v-alert>
-
-              <v-alert
-                v-if="profileLoaded && isPro && !businessId"
-                type="warning"
-                text
-                dense
-                class="mt-4 rounded-xl"
-                color="orange"
-              >
-                No business found. Please create a business first.
-              </v-alert>
             </div>
           </v-card>
 
-          <!-- Skip -->
-          <div class="text-center mt-6">
-            <v-btn text small color="grey darken-1" class="text-capitalize rounded-lg" @click="skipSetup">
+          <!-- Actions -->
+          <div class="d-flex justify-center align-center mt-6 flex-wrap">
+            <v-btn
+              text
+              small
+              color="grey darken-1"
+              class="text-capitalize rounded-lg mr-2"
+              @click="goToDashboard"
+            >
+              <v-icon left small>mdi-view-dashboard</v-icon>
+              Go to Dashboard
+            </v-btn>
+            <v-btn
+              text
+              small
+              color="grey darken-1"
+              class="text-capitalize rounded-lg"
+              @click="skipSetup"
+            >
               Skip for now
             </v-btn>
           </div>
@@ -117,7 +288,9 @@
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="4000" bottom rounded="lg" class="mb-4">
       <div class="d-flex align-center">
-        <v-icon left small>{{ snackbar.color === 'success' ? 'mdi-check-circle' : 'mdi-alert-circle' }}</v-icon>
+        <v-icon left small>
+          {{ snackbar.color === 'success' ? 'mdi-check-circle' : snackbar.color === 'warning' ? 'mdi-alert' : 'mdi-alert-circle' }}
+        </v-icon>
         {{ snackbar.text }}
       </div>
     </v-snackbar>
@@ -127,22 +300,64 @@
 <script>
 import api from '../services/api'
 
+// Plan → max branches (matches plans table features)
+const PLAN_LIMITS = {
+  free: 0,
+  starter: 1,
+  pro: 3,
+  business: Infinity,
+}
+
 export default {
   layout: 'public',
   name: 'SetupBranch',
-  
+
   data() {
     return {
       loading: false,
+      selectingId: null,
       uid: null,
       businessId: null,
       isPro: false,
       profileLoaded: false,
-      branches: [], // <-- Added: stores existing branches
+      planName: 'free',           // free | starter | pro | business
+      primaryBranchId: null,      // users.branch_id
+      branches: [],
       branch: { name: '', location: '' },
       snackbar: { show: false, text: '', color: 'success' },
-      authUnsubscribe: null
+      authUnsubscribe: null,
     }
+  },
+
+  computed: {
+    branchLimit() {
+      return PLAN_LIMITS[this.planName] ?? 0
+    },
+    branchLimitLabel() {
+      return this.branchLimit === Infinity ? '∞' : String(this.branchLimit)
+    },
+    remainingSlots() {
+      if (this.branchLimit === Infinity) return Infinity
+      return Math.max(0, this.branchLimit - this.branches.length)
+    },
+    atLimit() {
+      if (this.branchLimit === Infinity) return false
+      return this.branches.length >= this.branchLimit
+    },
+    canCreate() {
+      return this.isPro && this.businessId && !this.atLimit
+    },
+    planDisplayName() {
+      const map = { free: 'Free', starter: 'Starter', pro: 'Professional', business: 'Business' }
+      return map[this.planName] || 'Free'
+    },
+    planLabel() {
+      return this.planDisplayName
+    },
+    planColor() {
+      const map = { free: 'grey darken-1', starter: 'blue darken-2', pro: 'red darken-2', business: 'purple darken-2' }
+      return map[this.planName] || 'grey darken-1'
+    },
   },
 
   methods: {
@@ -162,7 +377,7 @@ export default {
       const nameLower = this.branch.name.trim().toLowerCase()
       const locationLower = this.branch.location.trim().toLowerCase()
 
-      return this.branches.find(b => {
+      return this.branches.find((b) => {
         const existingName = (b.name || '').toLowerCase()
         const existingLocation = (b.location || '').toLowerCase()
         return existingName === nameLower || existingLocation === locationLower
@@ -173,22 +388,41 @@ export default {
       try {
         if (!this.uid) return
         const { data } = await api.get(`/users/${this.uid}/profile`)
-        
-        // Check Pro subscription status
-        if (data.subscription_status === 'pro' || data.subscription === 'pro') {
+
+        // Resolve plan name from various possible fields
+        const rawPlan = (
+          data.subscription ||
+          data.plan ||
+          data.subscription_status ||
+          'free'
+        ).toString().toLowerCase()
+
+        if (['pro', 'professional'].includes(rawPlan) || data.subscription === 'pro') {
+          this.planName = 'pro'
+          this.isPro = true
+        } else if (['starter'].includes(rawPlan)) {
+          this.planName = 'starter'
+          this.isPro = true
+        } else if (['business'].includes(rawPlan)) {
+          this.planName = 'business'
+          this.isPro = true
+        } else if (data.subscription_status === 'active' && data.subscription) {
+          // Active but unknown name — treat as pro-capable
+          this.planName = data.subscription.toLowerCase()
           this.isPro = true
         } else {
+          this.planName = 'free'
           this.isPro = false
-          this.$router.push('/subscription')
-          return
         }
 
-        // Load business_id only if Pro
         if (data.business_id) {
           this.businessId = data.business_id
         }
 
-        // Load existing branches after profile is confirmed Pro
+        if (data.branch_id) {
+          this.primaryBranchId = data.branch_id
+        }
+
         await this.loadBranches()
       } catch (e) {
         console.error('Profile load error:', e)
@@ -201,6 +435,38 @@ export default {
       this.snackbar = { show: true, text, color }
     },
 
+    async setPrimaryBranch(b) {
+      if (!b || b.id === this.primaryBranchId) return
+      if (this.selectingId) return
+
+      this.selectingId = b.id
+      try {
+        // Update user's primary branch_id
+        await api.patch(`/users/${this.uid}/profile`, {
+          branch_id: b.id,
+        })
+        this.primaryBranchId = b.id
+        this.showSnackbar(`“${b.name}” set as primary branch`, 'success')
+      } catch (error) {
+        // Fallback: try PUT if PATCH not supported
+        try {
+          await api.put(`/users/${this.uid}/profile`, {
+            branch_id: b.id,
+          })
+          this.primaryBranchId = b.id
+          this.showSnackbar(`“${b.name}” set as primary branch`, 'success')
+        } catch (err2) {
+          console.error('Set primary branch error:', err2)
+          this.showSnackbar(
+            err2.response?.data?.message || 'Failed to set primary branch',
+            'error'
+          )
+        }
+      } finally {
+        this.selectingId = null
+      }
+    },
+
     async createBranch() {
       if (!this.branch.name || !this.branch.location) {
         this.showSnackbar('Please fill all fields', 'warning')
@@ -211,15 +477,21 @@ export default {
         return
       }
       if (!this.isPro) {
-        this.showSnackbar('Pro subscription required to create branches', 'error')
+        this.showSnackbar('An active subscription is required to create branches', 'error')
+        return
+      }
+      if (this.atLimit) {
+        this.showSnackbar(
+          `Your ${this.planDisplayName} plan allows only ${this.branchLimit} branch${this.branchLimit === 1 ? '' : 'es'}. Upgrade to add more.`,
+          'warning'
+        )
         return
       }
 
-      // Check for duplicates
       const duplicate = this.checkDuplicateBranch()
       if (duplicate) {
         this.showSnackbar(
-          `A branch already exists with name "${duplicate.name}" or location "${duplicate.location}"`,
+          `A branch already exists with name “${duplicate.name}” or location “${duplicate.location}”`,
           'error'
         )
         return
@@ -227,14 +499,33 @@ export default {
 
       this.loading = true
       try {
-        await api.post('/branches', {
+        const { data } = await api.post('/branches', {
           business_id: this.businessId,
-          name: this.branch.name,
-          location: this.branch.location,
-          firebase_uid: this.uid
+          name: this.branch.name.trim(),
+          location: this.branch.location.trim(),
+          firebase_uid: this.uid,
         })
-        this.showSnackbar('Branch created! Redirecting...')
-        setTimeout(() => this.$router.push('/dashboard'), 1200)
+
+        // Optimistically add to list
+        const created = data?.branch || data || {
+          id: data?.id,
+          name: this.branch.name.trim(),
+          location: this.branch.location.trim(),
+        }
+        if (created.id) {
+          this.branches.push(created)
+        } else {
+          // Reload to get server id
+          await this.loadBranches()
+        }
+
+        // If this is the first branch, set it as primary
+        if (this.branches.length === 1 && created.id) {
+          await this.setPrimaryBranch(created)
+        }
+
+        this.branch = { name: '', location: '' }
+        this.showSnackbar('Branch created successfully!', 'success')
       } catch (error) {
         this.showSnackbar(error.response?.data?.message || 'Failed to create branch', 'error')
       } finally {
@@ -242,13 +533,17 @@ export default {
       }
     },
 
+    goToDashboard() {
+      this.$router.push('/dashboard')
+    },
+
     skipSetup() {
       this.$router.push('/dashboard')
-    }
+    },
   },
 
   mounted() {
-    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged(user => {
+    this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
       if (!user) {
         this.$router.push('/login')
       } else {
@@ -262,7 +557,7 @@ export default {
     if (this.authUnsubscribe) {
       this.authUnsubscribe()
     }
-  }
+  },
 }
 </script>
 
@@ -271,7 +566,7 @@ export default {
   min-height: 100vh;
   background: #0a0a0f;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* Ambient Background */
@@ -335,7 +630,7 @@ export default {
   background: rgba(20, 20, 30, 0.6) !important;
   backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
               0 0 0 1px rgba(255, 255, 255, 0.02) inset;
 }
 
@@ -367,6 +662,42 @@ export default {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Branch list */
+.branch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.branch-item {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.branch-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateX(4px);
+}
+
+.branch-item.branch-primary {
+  background: rgba(211, 47, 47, 0.12);
+  border-color: rgba(211, 47, 47, 0.35);
+}
+
+.branch-item.branch-selecting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.min-width-0 {
+  min-width: 0;
+}
+
 /* Modern Inputs */
 .modern-input >>> .v-input__slot {
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -396,12 +727,16 @@ export default {
   color: rgba(211, 47, 47, 0.8) !important;
 }
 
+.modern-input.v-input--is-disabled >>> .v-input__slot {
+  opacity: 0.5;
+}
+
 /* Button */
 .hover-lift {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.hover-lift:hover {
+.hover-lift:hover:not(.v-btn--disabled) {
   transform: translateY(-2px);
   box-shadow: 0 10px 30px rgba(211, 47, 47, 0.4) !important;
 }

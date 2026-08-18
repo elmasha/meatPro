@@ -41,8 +41,18 @@
       </button>
     </div>
 
+    <!-- Full-page paywall for free / inactive users -->
+    <div v-if="!subActive" class="paywall">
+      <v-icon large color="error">mdi-lock</v-icon>
+      <h2>Reports & Analytics Locked</h2>
+      <p>Upgrade to <strong>Starter</strong>, <strong>Business</strong> or <strong>Pro</strong> to unlock detailed reports, profit analysis, waste tracking and more.</p>
+      <v-btn color="error" large class="mt-4" @click="$router.push('/subscription')">
+        View Plans
+      </v-btn>
+    </div>
+
     <!-- Loading State -->
-    <div v-if="loading" class="loading-overlay">
+    <div v-else-if="loading" class="loading-overlay">
       <div class="spinner"></div>
       <p>Loading reports...</p>
     </div>
@@ -51,10 +61,10 @@
       <!-- ===== COMPARATIVE CARDS ===== -->
       <div class="cards-grid">
         <!-- Revenue Card -->
-        <div class="metric-card revenue">
+        <div v-if="canViewBasicReports" class="metric-card revenue">
           <div class="card-header">
             <div class="icon-wrap"><v-icon>mdi-cash-multiple</v-icon></div>
-            <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('actual_revenue')">
+            <span v-if="hasComparativeData && canViewAdvancedAnalytics" class="change-badge" :class="getChangeClass('actual_revenue')">
               <v-icon small>{{ getChangeIcon('actual_revenue') }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.actual_revenue) || 0) }}%
             </span>
@@ -64,17 +74,24 @@
             <h3>Revenue</h3>
             <div class="amount">{{ formatCurrency(comparative.thisMonth.actual_revenue) }}</div>
             <p class="vs-text">vs last month</p>
-            <div v-if="hasRevenueVariance" class="sub-note">
+            <div v-if="hasRevenueVariance && canViewAdvancedReports" class="sub-note">
               Expected: {{ formatCurrency(comparative.thisMonth.expected_revenue) }}
             </div>
           </div>
         </div>
+        <div v-else class="metric-card locked">
+          <div class="locked-content">
+            <v-icon large>mdi-lock</v-icon>
+            <p>Revenue</p>
+            <small>Starter plan & above</small>
+          </div>
+        </div>
 
         <!-- Net Profit Card -->
-        <div class="metric-card profit">
+        <div v-if="canViewProfitAnalysis" class="metric-card profit">
           <div class="card-header">
             <div class="icon-wrap"><v-icon>mdi-chart-line</v-icon></div>
-            <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('actual_profit')">
+            <span v-if="hasComparativeData && canViewAdvancedAnalytics" class="change-badge" :class="getChangeClass('actual_profit')">
               <v-icon small>{{ getChangeIcon('actual_profit') }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.actual_profit) || 0) }}%
             </span>
@@ -86,17 +103,24 @@
               {{ formatCurrency(comparative.thisMonth.actual_profit) }}
             </div>
             <p class="vs-text">vs last month</p>
-            <div v-if="hasProfitVariance" class="sub-note">
+            <div v-if="hasProfitVariance && canViewAdvancedReports" class="sub-note">
               Expected: {{ formatCurrency(comparative.thisMonth.expected_profit) }}
             </div>
           </div>
         </div>
+        <div v-else class="metric-card locked">
+          <div class="locked-content">
+            <v-icon large>mdi-lock</v-icon>
+            <p>Net Profit</p>
+            <small>Business plan & above</small>
+          </div>
+        </div>
 
         <!-- Volume Card -->
-        <div class="metric-card volume">
+        <div v-if="canViewBasicReports" class="metric-card volume">
           <div class="card-header">
             <div class="icon-wrap"><v-icon>mdi-weight-kilogram</v-icon></div>
-            <span v-if="hasComparativeData" class="change-badge" :class="getChangeClass('sold')">
+            <span v-if="hasComparativeData && canViewAdvancedAnalytics" class="change-badge" :class="getChangeClass('sold')">
               <v-icon small>{{ getChangeIcon('sold') }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.sold) || 0) }}%
             </span>
@@ -108,12 +132,19 @@
             <p class="vs-text">vs last month</p>
           </div>
         </div>
+        <div v-else class="metric-card locked">
+          <div class="locked-content">
+            <v-icon large>mdi-lock</v-icon>
+            <p>Volume Sold</p>
+            <small>Starter plan & above</small>
+          </div>
+        </div>
 
         <!-- Waste Card -->
-        <div class="metric-card waste">
+        <div v-if="canViewWaste" class="metric-card waste">
           <div class="card-header">
             <div class="icon-wrap"><v-icon>mdi-delete-outline</v-icon></div>
-            <span v-if="hasComparativeData" class="change-badge" :class="getWasteChangeClass()">
+            <span v-if="hasComparativeData && canViewAdvancedAnalytics" class="change-badge" :class="getWasteChangeClass()">
               <v-icon small>{{ getWasteChangeIcon() }}</v-icon>
               {{ Math.abs(parseFloat(comparative.changes.waste) || 0) }}%
             </span>
@@ -125,10 +156,17 @@
             <p class="vs-text">vs last month</p>
           </div>
         </div>
+        <div v-else class="metric-card locked">
+          <div class="locked-content">
+            <v-icon large>mdi-lock</v-icon>
+            <p>Waste Rate</p>
+            <small>Business plan & above</small>
+          </div>
+        </div>
       </div>
 
       <!-- ===== REVENUE VARIANCE ALERT ===== -->
-      <div v-if="showVarianceAlert" class="variance-alert" :class="revenueVariance > 0 ? 'warning' : 'success'">
+      <div v-if="showVarianceAlert && canViewAdvancedReports" class="variance-alert" :class="revenueVariance > 0 ? 'warning' : 'success'">
         <div class="alert-icon">
           <v-icon>{{ revenueVariance > 0 ? 'mdi-alert' : 'mdi-check-circle' }}</v-icon>
         </div>
@@ -154,7 +192,11 @@
             <span class="chart-badge">Daily</span>
           </div>
           <div class="chart-body">
-            <div v-if="!hasProfitTrend" class="empty-state">
+            <div v-if="!canViewProfitAnalysis" class="locked-section">
+              <v-icon large>mdi-lock</v-icon>
+              <p>Profit Trend requires <strong>Business</strong> plan or higher</p>
+            </div>
+            <div v-else-if="!hasProfitTrend" class="empty-state">
               <v-icon large color="grey lighten-2">mdi-chart-bar</v-icon>
               <p>No data for selected period</p>
             </div>
@@ -177,7 +219,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="hasProfitTrend" class="chart-legend">
+            <div v-if="hasProfitTrend && canViewProfitAnalysis" class="chart-legend">
               <span><i class="dot profit"></i> Profit</span>
               <span><i class="dot loss"></i> Loss</span>
             </div>
@@ -193,7 +235,11 @@
             </div>
           </div>
           <div class="chart-body">
-            <div v-if="!hasDayOfWeek" class="empty-state">
+            <div v-if="!canViewBasicReports" class="locked-section">
+              <v-icon large>mdi-lock</v-icon>
+              <p>Best Days requires <strong>Starter</strong> plan or higher</p>
+            </div>
+            <div v-else-if="!hasDayOfWeek" class="empty-state">
               <v-icon large color="grey lighten-2">mdi-calendar</v-icon>
               <p>No data available</p>
             </div>
@@ -234,35 +280,42 @@
               <h3><v-icon left color="error">mdi-delete-outline</v-icon> Waste Analysis</h3>
               <p class="card-subtitle">Cost of spoilage & trimmings</p>
             </div>
-            <span class="badge">{{ wasteData.avgWastePct || 0 }}% avg</span>
+            <span v-if="canViewWaste" class="badge">{{ wasteData.avgWastePct || 0 }}% avg</span>
           </div>
-          <div class="waste-total">
-            <span>Total Waste Cost</span>
-            <strong>{{ formatCurrency(wasteData.totalWasteCost) }}</strong>
+
+          <div v-if="!canViewWaste" class="locked-section">
+            <v-icon large>mdi-lock</v-icon>
+            <p>Waste Analysis requires <strong>Business</strong> plan or higher</p>
           </div>
-          <div class="data-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Waste (kg)</th>
-                  <th>%</th>
-                  <th>Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(item, i) in wasteData.data" :key="i">
-                  <td>{{ formatDate(item.date) }}</td>
-                  <td>{{ item.waste_kg }} kg</td>
-                  <td><span class="pct-badge">{{ parseFloat(item.waste_pct || 0).toFixed(1) }}%</span></td>
-                  <td>{{ formatCurrency(item.waste_cost) }}</td>
-                </tr>
-                <tr v-if="!wasteData.data || wasteData.data.length === 0">
-                  <td colspan="4" class="empty-cell">No waste data</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <template v-else>
+            <div class="waste-total">
+              <span>Total Waste Cost</span>
+              <strong>{{ formatCurrency(wasteData.totalWasteCost) }}</strong>
+            </div>
+            <div class="data-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Waste (kg)</th>
+                    <th>%</th>
+                    <th>Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, i) in wasteData.data" :key="i">
+                    <td>{{ formatDate(item.date) }}</td>
+                    <td>{{ item.waste_kg }} kg</td>
+                    <td><span class="pct-badge">{{ parseFloat(item.waste_pct || 0).toFixed(1) }}%</span></td>
+                    <td>{{ formatCurrency(item.waste_cost) }}</td>
+                  </tr>
+                  <tr v-if="!wasteData.data || wasteData.data.length === 0">
+                    <td colspan="4" class="empty-cell">No waste data</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
         </div>
 
         <!-- Payment Mix -->
@@ -272,51 +325,58 @@
               <h3><v-icon left color="error">mdi-credit-card-outline</v-icon> Payment Mix</h3>
               <p class="card-subtitle">M-Pesa vs Cash breakdown</p>
             </div>
-            <span class="badge mpesa">{{ paymentMix.avgMpesaPct || 0 }}% M-Pesa</span>
+            <span v-if="canViewBasicReports" class="badge mpesa">{{ paymentMix.avgMpesaPct || 0 }}% M-Pesa</span>
           </div>
-          <div class="payment-donuts">
-            <div class="donut-wrap">
-              <div class="donut" :style="donutStyleMpesa">
-                <span class="donut-label">{{ paymentMix.avgMpesaPct || 0 }}%</span>
+
+          <div v-if="!canViewBasicReports" class="locked-section">
+            <v-icon large>mdi-lock</v-icon>
+            <p>Payment Mix requires <strong>Starter</strong> plan or higher</p>
+          </div>
+          <template v-else>
+            <div class="payment-donuts">
+              <div class="donut-wrap">
+                <div class="donut" :style="donutStyleMpesa">
+                  <span class="donut-label">{{ paymentMix.avgMpesaPct || 0 }}%</span>
+                </div>
+                <span class="donut-name">M-Pesa</span>
+                <span class="donut-amount">{{ formatCurrency(paymentMix.totalMpesa) }}</span>
               </div>
-              <span class="donut-name">M-Pesa</span>
-              <span class="donut-amount">{{ formatCurrency(paymentMix.totalMpesa) }}</span>
-            </div>
-            <div class="donut-wrap">
-              <div class="donut" :style="donutStyleCash">
-                <span class="donut-label">{{ cashPct }}%</span>
+              <div class="donut-wrap">
+                <div class="donut" :style="donutStyleCash">
+                  <span class="donut-label">{{ cashPct }}%</span>
+                </div>
+                <span class="donut-name">Cash</span>
+                <span class="donut-amount">{{ formatCurrency(paymentMix.totalCash) }}</span>
               </div>
-              <span class="donut-name">Cash</span>
-              <span class="donut-amount">{{ formatCurrency(paymentMix.totalCash) }}</span>
             </div>
-          </div>
-          <div v-if="showPaymentVariance" class="variance-mini">
-            <v-icon small color="orange darken-2">mdi-alert-circle</v-icon>
-            Revenue variance: {{ formatCurrency(paymentMix.revenueVariance) }}
-          </div>
-          <div class="data-table compact">
-            <table>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>M-Pesa</th>
-                  <th>Cash</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(item, i) in paymentMix.data" :key="i">
-                  <td>{{ formatDate(item.date) }}</td>
-                  <td class="mpesa">{{ formatCurrency(item.payment_mpesa) }}</td>
-                  <td class="cash">{{ formatCurrency(item.payment_cash) }}</td>
-                  <td><strong>{{ formatCurrency(getItemActualRevenue(item)) }}</strong></td>
-                </tr>
-                <tr v-if="!paymentMix.data || paymentMix.data.length === 0">
-                  <td colspan="4" class="empty-cell">No payment data</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+            <div v-if="showPaymentVariance" class="variance-mini">
+              <v-icon small color="orange darken-2">mdi-alert-circle</v-icon>
+              Revenue variance: {{ formatCurrency(paymentMix.revenueVariance) }}
+            </div>
+            <div class="data-table compact">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>M-Pesa</th>
+                    <th>Cash</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, i) in paymentMix.data" :key="i">
+                    <td>{{ formatDate(item.date) }}</td>
+                    <td class="mpesa">{{ formatCurrency(item.payment_mpesa) }}</td>
+                    <td class="cash">{{ formatCurrency(item.payment_cash) }}</td>
+                    <td><strong>{{ formatCurrency(getItemActualRevenue(item)) }}</strong></td>
+                  </tr>
+                  <tr v-if="!paymentMix.data || paymentMix.data.length === 0">
+                    <td colspan="4" class="empty-cell">No payment data</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -327,9 +387,14 @@
             <h3><v-icon left color="error">mdi-receipt</v-icon> Expense Breakdown</h3>
             <p class="card-subtitle">Where your money goes</p>
           </div>
-          <span class="total-expense">{{ formatCurrency(expenseData.grandTotal) }}</span>
+          <span v-if="canViewBasicReports" class="total-expense">{{ formatCurrency(expenseData.grandTotal) }}</span>
         </div>
-        <div class="expense-grid">
+
+        <div v-if="!canViewBasicReports" class="locked-section">
+          <v-icon large>mdi-lock</v-icon>
+          <p>Expense Breakdown requires <strong>Starter</strong> plan or higher</p>
+        </div>
+        <div v-else class="expense-grid">
           <div class="expense-bars">
             <div v-for="(item, i) in expenseData.data" :key="i" class="expense-bar-item">
               <div class="expense-info">
@@ -382,78 +447,89 @@
             <h3><v-icon left color="error">mdi-table</v-icon> Daily Summary</h3>
             <p class="card-subtitle">Complete daily records ({{ dailySummary.length }} days)</p>
           </div>
-          <v-btn text small color="error" class="export-btn" @click="exportCSV">
+          <v-btn 
+            v-if="canViewAdvancedReports" 
+            text small color="error" class="export-btn" 
+            @click="exportCSV"
+          >
             <v-icon left small>mdi-download</v-icon> Export CSV
           </v-btn>
         </div>
-        <div class="data-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Actual Revenue</th>
-                <th>Expected Revenue</th>
-                <th>Actual Profit</th>
-                <th>Margin</th>
-                <th>Sold</th>
-                <th>Waste %</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, i) in paginatedSummary" :key="i">
-                <td>
-                  <div class="date-cell">
-                    <span class="date-day">{{ formatDay(item.date) }}</span>
-                    <span class="date-full">{{ formatDate(item.date) }}</span>
-                  </div>
-                </td>
-                <td>
-                  <strong>{{ formatCurrency(item.actual_revenue || item.revenue) }}</strong>
-                </td>
-                <td class="muted">
-                  {{ formatCurrency(item.expected_revenue || item.revenue) }}
-                </td>
-                <td>
-                  <span class="chip" :class="getAmountClass(item.actual_profit || item.profit)">
-                    {{ formatCurrency(item.actual_profit || item.profit) }}
-                  </span>
-                </td>
-                <td>
-                  <span :class="getAmountClass(getItemMargin(item))">
-                    {{ getItemMargin(item).toFixed(1) }}%
-                  </span>
-                </td>
-                <td>{{ item.sold_kg || 0 }} kg</td>
-                <td>
-                  <span class="waste-badge" :class="getWasteClass(item)">
-                    {{ getWastePct(item) }}%
-                  </span>
-                </td>
-              </tr>
-              <tr v-if="dailySummary.length === 0">
-                <td colspan="7" class="empty-cell">No daily records found</td>
-              </tr>
-            </tbody>
-          </table>
+
+        <div v-if="!canViewBasicReports" class="locked-section">
+          <v-icon large>mdi-lock</v-icon>
+          <p>Daily Summary requires <strong>Starter</strong> plan or higher</p>
         </div>
-        <div class="pagination" v-if="dailySummary.length > rowsPerPage">
-          <span>Rows per page: 
-            <select v-model="rowsPerPage">
-              <option :value="10">10</option>
-              <option :value="25">25</option>
-              <option :value="50">50</option>
-            </select>
-          </span>
-          <span>{{ paginationText }}</span>
-          <div class="page-nav">
-            <v-btn icon x-small :disabled="currentPage === 1" @click="currentPage--">
-              <v-icon>mdi-chevron-left</v-icon>
-            </v-btn>
-            <v-btn icon x-small :disabled="currentPage >= totalPages" @click="currentPage++">
-              <v-icon>mdi-chevron-right</v-icon>
-            </v-btn>
+        <template v-else>
+          <div class="data-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Actual Revenue</th>
+                  <th>Expected Revenue</th>
+                  <th>Actual Profit</th>
+                  <th>Margin</th>
+                  <th>Sold</th>
+                  <th>Waste %</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, i) in paginatedSummary" :key="i">
+                  <td>
+                    <div class="date-cell">
+                      <span class="date-day">{{ formatDay(item.date) }}</span>
+                      <span class="date-full">{{ formatDate(item.date) }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <strong>{{ formatCurrency(item.actual_revenue || item.revenue) }}</strong>
+                  </td>
+                  <td class="muted">
+                    {{ formatCurrency(item.expected_revenue || item.revenue) }}
+                  </td>
+                  <td>
+                    <span class="chip" :class="getAmountClass(item.actual_profit || item.profit)">
+                      {{ formatCurrency(item.actual_profit || item.profit) }}
+                    </span>
+                  </td>
+                  <td>
+                    <span :class="getAmountClass(getItemMargin(item))">
+                      {{ getItemMargin(item).toFixed(1) }}%
+                    </span>
+                  </td>
+                  <td>{{ item.sold_kg || 0 }} kg</td>
+                  <td>
+                    <span class="waste-badge" :class="getWasteClass(item)">
+                      {{ getWastePct(item) }}%
+                    </span>
+                  </td>
+                </tr>
+                <tr v-if="dailySummary.length === 0">
+                  <td colspan="7" class="empty-cell">No daily records found</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-        </div>
+          <div class="pagination" v-if="dailySummary.length > rowsPerPage">
+            <span>Rows per page: 
+              <select v-model="rowsPerPage">
+                <option :value="10">10</option>
+                <option :value="25">25</option>
+                <option :value="50">50</option>
+              </select>
+            </span>
+            <span>{{ paginationText }}</span>
+            <div class="page-nav">
+              <v-btn icon x-small :disabled="currentPage === 1" @click="currentPage--">
+                <v-icon>mdi-chevron-left</v-icon>
+              </v-btn>
+              <v-btn icon x-small :disabled="currentPage >= totalPages" @click="currentPage++">
+                <v-icon>mdi-chevron-right</v-icon>
+              </v-btn>
+            </div>
+          </div>
+        </template>
       </div>
     </template>
   </div>
@@ -486,6 +562,9 @@ export default {
       paymentMix: { data: [], totalCash: 0, totalMpesa: 0, totalActualRevenue: 0, totalExpectedRevenue: 0, avgMpesaPct: 0, revenueVariance: 0 },
       expenseData: { data: [], grandTotal: 0 },
       dailySummary: [],
+      subData: null,
+      subActive: false,
+      features: [],
 
       currentPage: 1,
       rowsPerPage: 10,
@@ -585,6 +664,23 @@ export default {
       const start = (this.currentPage - 1) * this.rowsPerPage + 1;
       const end = Math.min(this.currentPage * this.rowsPerPage, total);
       return `${start}-${end} of ${total}`;
+    },
+
+    // ===== FEATURE ACCESS HELPERS =====
+    canViewBasicReports() {
+      return this.hasFeature('Basic reports') || this.hasFeature('Advance reports');
+    },
+    canViewAdvancedReports() {
+      return this.hasFeature('Advance reports') || this.hasFeature('Advanced analytics');
+    },
+    canViewProfitAnalysis() {
+      return this.hasFeature('Profit Analysis') || this.hasFeature('Advance reports');
+    },
+    canViewWaste() {
+      return this.hasFeature('Full stock management') || this.hasFeature('Advance reports');
+    },
+    canViewAdvancedAnalytics() {
+      return this.hasFeature('Advanced analytics');
     }
   },
 
@@ -603,6 +699,7 @@ export default {
         const user = this.$fire?.auth?.currentUser;
         if (user) {
           this.user = user;
+          await this.checkSubscription();
           const { data } = await apiClient.get(`/users/${user.uid}/profile`);
           this.userProfile = data;
           if (data.branch_id) {
@@ -614,6 +711,45 @@ export default {
         console.error('Init error:', e);
       }
       this.loadAll();
+    },
+
+    async checkSubscription() {
+      try {
+        const { data } = await apiClient.get(`/subscriptions/status?firebase_uid=${this.user.uid}`);
+        this.subData = data;
+        this.subActive = data?.is_active === true;
+        this.features = this.parseFeatures(data?.subscription?.features);
+      } catch (e) {
+        console.error('Subscription check error:', e);
+        this.subActive = false;
+        this.features = [];
+      }
+    },
+
+    hasFeature(name) {
+      if (!this.subActive) return false;
+
+      // Pro plan unlocks everything
+      const planName = (
+        this.subData?.subscription?.plan_name ||
+        this.subData?.subscription?.plan ||
+        this.subData?.plan ||
+        ''
+      ).toLowerCase();
+
+      if (planName === 'pro') return true;
+
+      return this.features.some(f => 
+        String(f).toLowerCase().includes(name.toLowerCase())
+      );
+    },
+
+    parseFeatures(features) {
+      if (!features) return [];
+      if (typeof features === 'string') {
+        try { return JSON.parse(features); } catch { return []; }
+      }
+      return Array.isArray(features) ? features : [];
     },
 
     async loadBranches() {
@@ -635,7 +771,6 @@ export default {
         return;
       }
       this.loading = true;
-      console.log('Loading reports for branch:', this.selectedBranch, 'period:', this.selectedPeriod);
       try {
         await Promise.all([
           this.loadComparative(),
@@ -653,7 +788,6 @@ export default {
 
     async loadComparative() {
       try {
-        console.log('loadComparative: fetching...');
         const { data } = await apiClient.get(`/reports/comparative`, {
           params: { branch_id: this.selectedBranch }
         });
@@ -681,7 +815,6 @@ export default {
 
     async loadProfitability() {
       try {
-        console.log('loadProfitability: fetching...');
         const { data } = await apiClient.get(`/reports/profitability`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
@@ -699,7 +832,6 @@ export default {
 
     async loadWaste() {
       try {
-        console.log('loadWaste: fetching...');
         const { data } = await apiClient.get(`/reports/waste-analysis`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
@@ -716,7 +848,6 @@ export default {
 
     async loadPaymentMix() {
       try {
-        console.log('loadPaymentMix: fetching...');
         const { data } = await apiClient.get(`/reports/payment-mix`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
@@ -737,7 +868,6 @@ export default {
 
     async loadExpenses() {
       try {
-        console.log('loadExpenses: fetching...');
         const { data } = await apiClient.get(`/reports/expense-breakdown`, {
           params: { branch_id: this.selectedBranch, days: this.selectedPeriod }
         });
@@ -750,7 +880,6 @@ export default {
         this.expenseData = { data: [], grandTotal: 0 };
       }
     },
-
 
     getProfitTrendValue(item) {
       return item.actual_profit !== undefined ? item.actual_profit : (item.profit || 0);
@@ -766,7 +895,6 @@ export default {
       return val >= 0 ? 'positive' : 'negative';
     },
 
-    // ===== FORMATTING HELPERS =====
     formatCurrency(n) {
       if (n === null || n === undefined || isNaN(n)) return 'Ksh 0';
       return new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(n);
@@ -814,7 +942,6 @@ export default {
       return ((p / r) * 100).toFixed(1) + '%';
     },
 
-    // ===== COMPUTED HELPERS =====
     getChangeClass(field) {
       const val = parseFloat(this.comparative.changes[field]) || 0;
       return val >= 0 ? 'up' : 'down';
@@ -882,8 +1009,9 @@ export default {
       return 'danger';
     },
 
-    // ===== EXPORT =====
     exportCSV() {
+      if (!this.canViewAdvancedReports) return;
+
       const headers = ['Date', 'Actual Revenue', 'Expected Revenue', 'Actual Profit', 'Expected Profit', 'Margin %', 'Sold kg', 'Waste %', 'Cash', 'M-Pesa'];
       const rows = this.dailySummary.map(item => [
         item.date,
@@ -1027,6 +1155,32 @@ export default {
 
 .tab-btn:hover:not(.active) { background: #f3f4f6; }
 
+/* Paywall */
+.paywall {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  text-align: center;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #f3f4f6;
+  margin-top: 20px;
+}
+
+.paywall h2 {
+  margin: 16px 0 8px;
+  font-size: 22px;
+  color: #111827;
+}
+
+.paywall p {
+  color: #6b7280;
+  max-width: 420px;
+  line-height: 1.5;
+}
+
 /* Loading */
 .loading-overlay {
   display: flex;
@@ -1060,6 +1214,51 @@ export default {
   padding: 20px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   border: 1px solid #f3f4f6;
+}
+
+.metric-card.locked {
+  background: #f9fafb;
+  border: 1px dashed #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+  opacity: 0.9;
+}
+
+.locked-content {
+  text-align: center;
+  color: #9ca3af;
+}
+
+.locked-content .v-icon {
+  margin-bottom: 8px;
+  color: #d1d5db;
+}
+
+.locked-content p {
+  margin: 0 0 4px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.locked-content small {
+  font-size: 12px;
+}
+
+.locked-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+  color: #9ca3af;
+  gap: 12px;
+}
+
+.locked-section .v-icon {
+  color: #d1d5db;
 }
 
 .card-header {
@@ -1146,11 +1345,6 @@ export default {
   border: 1px solid #fed7aa;
 }
 
-.variance-alert.info {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-}
-
 .variance-alert.success {
   background: #f0fdf4;
   border: 1px solid #86efac;
@@ -1162,7 +1356,6 @@ export default {
 }
 
 .variance-alert.warning .alert-icon { color: #f97316; }
-.variance-alert.info .alert-icon { color: #3b82f6; }
 .variance-alert.success .alert-icon { color: #22c55e; }
 
 .alert-content h4 {
@@ -1491,18 +1684,6 @@ export default {
   font-size: 12px;
   margin-bottom: 12px;
 }
-
-.variance-mini.surplus {
-  background: #f0fdf4;
-  color: #15803d;
-}
-
-.variance-mini.shortfall {
-  background: #fff7ed;
-  color: #c2410c;
-}
-
-.variance-mini .v-icon { margin-right: 6px; }
 
 /* Expense Card */
 .expense-card {

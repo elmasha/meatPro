@@ -52,7 +52,7 @@
           <!-- Setup Branches button for Pro users -->
           <v-slide-y-transition>
             <v-btn
-              v-if="proStatus === true"
+              v-if="canUseMultiBranch"
               block
               color="red darken-2"
               dark
@@ -111,8 +111,9 @@
                       color="red lighten-5 red--text"
                       class="ml-2 font-weight-bold hidden-xs-only"
                       label
-                      >Branch {{ branchId }}</v-chip
                     >
+                      {{ isConsolidated ? 'All Branches' : `Branch ${branchId || '—'}` }}
+                    </v-chip>
                   </div>
                   <div class="d-flex align-center mt-1">
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
@@ -124,7 +125,7 @@
             </v-col>
             <v-col cols="4" sm="6" class="d-flex justify-end align-center">
               <v-btn
-              v-if="proStatus === true"
+              v-if="canUseMultiBranch"
               color="red darken-2"
               dark
               icon
@@ -217,7 +218,7 @@
                 <div class="text-body-2 grey--text text--darken-1">
                   {{ subData?.subscription?.status === 'cancelled' 
                     ? 'Your subscription was cancelled. Renew to continue recording daily entries.' 
-                    : 'Activate a Pro subscription to record daily stock, sales, and expenses.' }}
+                    : 'Activate a Starter, Business, or Pro plan to record daily stock, sales, and expenses.' }}
                 </div>
               </div>
               <v-btn
@@ -266,14 +267,14 @@
         </v-slide-y-transition>
 
         <!-- Branch Selector Bar -->
-        <v-row v-if="proStatus === true && branches.length > 1" dense class="mb-2 reveal-card">
+        <v-row v-if="canUseMultiBranch && branches.length > 1" dense class="mb-2 reveal-card">
           <v-col cols="12">
             <v-card class="rounded-xl pa-3 d-flex align-center" elevation="1" outlined>
               <v-icon small color="grey darken-1" class="mr-3">mdi-store</v-icon>
               <span class="text-caption grey--text text--darken-1 font-weight-medium mr-3 hidden-xs-only">Switch Branch</span>
               <v-select
                 v-model="selectedBranch"
-                :items="branches.map(branch => branch.name)"
+                :items="branchSelectItems"
                 @change="SelectionChange(selectedBranch)"
                 dense
                 outlined
@@ -281,11 +282,22 @@
                 rounded
                 placeholder="Select Branch"
                 class="rounded-lg branch-select-modern"
-                style="max-width: 260px;"
+                style="max-width: 280px;"
               ></v-select>
+              <v-chip
+                v-if="isConsolidated"
+                x-small
+                color="purple lighten-5"
+                text-color="purple darken-2"
+                class="ml-3 font-weight-bold"
+                label
+              >
+                <v-icon x-small left>mdi-view-dashboard-variant</v-icon>
+                Consolidated
+              </v-chip>
               <v-spacer />
               <v-btn
-                v-if="proStatus === true"
+                v-if="canUseMultiBranch"
                 small
                 text
                 color="red darken-2"
@@ -491,23 +503,23 @@
                   <v-btn
                     block
                     x-large
-                    :color="!subActive ? 'grey lighten-3' : todayEntryExists ? 'grey lighten-3' : 'red darken-2'"
-                    :dark="subActive && !todayEntryExists"
+                    :color="!subActive || isConsolidated ? 'grey lighten-3' : todayEntryExists ? 'grey lighten-3' : 'red darken-2'"
+                    :dark="subActive && !todayEntryExists && !isConsolidated"
                     elevation="0"
                     class="rounded-0 py-6 py-sm-7 action-btn-modern"
-                    @click="subActive ? openCloseDay() : $router.push('/subscription')"
+                    @click="handleCloseDayClick"
                   >
                     <div class="d-flex align-center justify-center w-100 px-4">
                       <v-avatar
-                        :color="!subActive ? 'grey' : todayEntryExists ? 'grey' : 'white'"
+                        :color="!subActive || isConsolidated ? 'grey' : todayEntryExists ? 'grey' : 'white'"
                         size="52"
                         class="mr-4 action-avatar"
                       >
                         <v-icon
-                          :color="!subActive ? 'white' : todayEntryExists ? 'white' : 'red darken-2'"
+                          :color="!subActive || isConsolidated ? 'white' : todayEntryExists ? 'white' : 'red darken-2'"
                           size="28"
                         >
-                          {{ !subActive ? 'mdi-lock' : todayEntryExists ? 'mdi-check-circle' : 'mdi-store-check' }}
+                          {{ !subActive ? 'mdi-lock' : isConsolidated ? 'mdi-view-dashboard-variant' : todayEntryExists ? 'mdi-check-circle' : 'mdi-store-check' }}
                         </v-icon>
                       </v-avatar>
                       <div class="text-left flex-grow-1">
@@ -515,15 +527,17 @@
                           {{
                             !subActive 
                               ? 'Activate Subscription to Record' 
-                              : todayEntryExists 
-                                ? "Today's Entry Complete" 
-                                : 'Close Business Day'
+                              : isConsolidated
+                                ? 'Select a Branch to Close Day'
+                                : todayEntryExists 
+                                  ? "Today's Entry Complete" 
+                                  : 'Close Business Day'
                           }}
                         </div>
                         <div
                           class="text-caption mt-1"
                           :class="
-                            !subActive 
+                            !subActive || isConsolidated
                               ? 'grey--text' 
                               : todayEntryExists 
                                 ? 'grey--text' 
@@ -532,14 +546,17 @@
                         >
                           {{
                             !subActive
-                              ? 'Upgrade to Pro to unlock daily stock & sales recording'
-                              : todayEntryExists
-                                ? `Recorded at ${todayEntryTime}`
-                                : 'Record stock, sales & expenses to lock in your daily numbers'
+                              ? 'Activate a plan to unlock daily stock & sales recording'
+                              : isConsolidated
+                                ? 'Switch to a specific branch to record daily stock, sales & expenses'
+                                : todayEntryExists
+                                  ? `Recorded at ${todayEntryTime}`
+                                  : 'Record stock, sales & expenses to lock in your daily numbers'
                           }}
                         </div>
                       </div>
                       <v-icon v-if="!subActive" large class="ml-2">mdi-arrow-right</v-icon>
+                      <v-icon v-else-if="isConsolidated" large class="ml-2">mdi-arrow-right</v-icon>
                       <v-icon v-else-if="!todayEntryExists" large class="ml-2">mdi-arrow-right</v-icon>
                       <v-chip
                         v-else
@@ -780,9 +797,11 @@
                   </v-avatar>
                   <div>
                     <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                      Recent Entries
+                      {{ isConsolidated ? 'All Branches – Recent Entries' : 'Recent Entries' }}
                     </div>
-                    <div class="text-caption grey--text">Last 30 days of business records</div>
+                    <div class="text-caption grey--text">
+                      {{ isConsolidated ? `Combined view across ${branches.length} branches` : 'Last 30 days of business records' }}
+                    </div>
                   </div>
                 </div>
                 <v-spacer />
@@ -800,14 +819,25 @@
               </v-card-title>
               <v-divider />
               <v-data-table
-                :headers="headers"
+                :headers="tableHeaders"
                 :items="filteredEntries"
-                :items-per-page="5"
+                :items-per-page="isConsolidated ? 8 : 5"
                 dense
                 hide-default-footer
                 class="rounded-b-xl entries-table-modern"
                 mobile-breakpoint="600"
               >
+                <template v-slot:item.branch_name="{ item }">
+                  <v-chip
+                    x-small
+                    color="blue lighten-5"
+                    text-color="blue darken-2"
+                    label
+                    class="font-weight-medium"
+                  >
+                    {{ item.branch_name || '—' }}
+                  </v-chip>
+                </template>
                 <template v-slot:item.date="{ item }">
                   <div class="d-flex align-center py-2">
                     <v-avatar :color="dateColor(item.date)" size="32" class="mr-3">
@@ -871,7 +901,7 @@
                     color="grey lighten-1"
                     class="hover-red"
                     @click="editEntry(item)"
-                    :disabled="!subActive"
+                    :disabled="!subActive || isConsolidated"
                   >
                     <v-icon x-small>mdi-pencil</v-icon>
                   </v-btn>
@@ -881,10 +911,10 @@
                     <v-icon size="48" color="grey lighten-2">mdi-calendar-blank</v-icon>
                     <div class="text-h6 grey--text mt-3">No entries yet</div>
                     <div class="text-body-2 grey--text text--lighten-1 mb-4">
-                      {{ subActive ? 'Start by closing today\'s business day' : 'Activate subscription to start recording' }}
+                      {{ subActive ? (isConsolidated ? 'No entries across branches yet' : 'Start by closing today\'s business day') : 'Activate subscription to start recording' }}
                     </div>
                     <v-btn
-                      v-if="subActive"
+                      v-if="subActive && !isConsolidated"
                       color="red darken-2"
                       dark
                       class="rounded-lg text-capitalize"
@@ -924,9 +954,9 @@
         <span>Home</span>
         <v-icon>mdi-home</v-icon>
       </v-btn>
-      <v-btn @click="subActive ? openCloseDay() : $router.push('/subscription')">
+      <v-btn @click="handleCloseDayClick">
         <span>Close</span>
-        <v-icon>{{ subActive ? 'mdi-plus-circle' : 'mdi-lock' }}</v-icon>
+        <v-icon>{{ !subActive ? 'mdi-lock' : isConsolidated ? 'mdi-view-dashboard-variant' : 'mdi-plus-circle' }}</v-icon>
       </v-btn>
       <v-btn to="/reports">
         <span>Reports</span>
@@ -974,10 +1004,10 @@
         </v-list>
         <v-divider class="my-4" />
 
-        <!-- Setup Branches for Pro users -->
+        <!-- Setup Branches for Pro users only -->
         <v-slide-y-transition>
           <v-btn
-            v-if="proStatus === true"
+            v-if="canUseMultiBranch"
             block
             color="red darken-2"
             dark
@@ -1638,10 +1668,13 @@ export default {
       subActive: false,
       subData: null,
       userProfile: null,
+      // Plan tier from plans table: 'free' | 'starter' | 'business' | 'pro'
+      planTier: 'free',
       // ── Existing Data ───────────────────────────────────────────
 
-      proStatus: false,
+      proStatus: false, // true only for pro (multi-branch / consolidated)
       branches: [],
+      isConsolidated: false,
       nav_bars: false,
       mobileDrawer: false,
       bottomNav: 0,
@@ -1722,6 +1755,45 @@ export default {
     userInitials() {
       return this.userName.substring(0, 2).toUpperCase()
     },
+    // ── Feature flags aligned with plans table ─────────────────
+    // starter: 1 branch, basic stock, limited history
+    // business: 1 branch, full stock/sales/expenses/COGS/daily closing/profit
+    // pro: up to 3 branches, consolidated reporting, advanced analytics
+    canRecordDaily() {
+      // Any active paid plan can close day / record stock & sales
+      return this.subActive === true
+    },
+    canUseMultiBranch() {
+      // Only Pro: multi-branch, setup branches, consolidated view
+      return this.planTier === 'pro' && this.subActive
+    },
+    canViewAdvancedReports() {
+      // Business + Pro get full/advanced reports; starter is limited
+      return this.subActive && (this.planTier === 'business' || this.planTier === 'pro')
+    },
+    planDisplayName() {
+      const map = { starter: 'Starter', business: 'Business', pro: 'Professional', free: 'Free' }
+      return map[this.planTier] || 'Free'
+    },
+    branchSelectItems() {
+      if (!this.branches || this.branches.length === 0) return []
+      return ['All Branches', ...this.branches.map(b => b.name)]
+    },
+    tableHeaders() {
+      if (this.isConsolidated) {
+        return [
+          { text: 'Branch', value: 'branch_name', width: '110' },
+          { text: 'Date', value: 'date', width: '120' },
+          { text: 'Sold', value: 'sold_kg', align: 'end' },
+          { text: 'Actual Revenue', value: 'actual_revenue', align: 'end' },
+          { text: 'Expected Revenue', value: 'revenue', align: 'end' },
+          { text: 'Profit', value: 'profit', align: 'end' },
+          { text: 'Total Cost', value: 'total_cost', align: 'end' },
+          { text: '', value: 'actions', align: 'end', sortable: false, width: '40' },
+        ]
+      }
+      return this.headers
+    },
     formattedToday() {
       return moment().format('dddd, MMM D')
     },
@@ -1763,6 +1835,7 @@ export default {
       return parseFloat(this.wastePct) > 5
     },
     showMissedEntryAlert() {
+      if (this.isConsolidated) return false
       const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD')
       return !this.recentEntries.find((e) => e.date === yesterday) && this.isToday
     },
@@ -1770,6 +1843,7 @@ export default {
       return this.lastClosingStock !== null ? `Yesterday: ${this.lastClosingStock}kg` : ''
     },
     todayEntryExists() {
+      if (this.isConsolidated) return false
       return this.recentEntries.some((e) => e.date === this.searchDate2)
     },
     mpesaPct() {
@@ -1788,8 +1862,18 @@ export default {
       return total / this.recentEntries.length
     },
     filteredEntries() {
-      if (!this.searchQuery) return this.recentEntries
-      return this.recentEntries.filter((e) => e.date.includes(this.searchQuery))
+      // Starter plan: limited historical data (last 14 days)
+      let list = this.recentEntries
+      if (this.planTier === 'starter') {
+        const cutoff = moment().subtract(14, 'days').format('YYYY-MM-DD')
+        list = list.filter((e) => e.date >= cutoff)
+      }
+      if (!this.searchQuery) return list
+      const q = this.searchQuery.toLowerCase()
+      return list.filter((e) =>
+        e.date.includes(this.searchQuery) ||
+        (e.branch_name && e.branch_name.toLowerCase().includes(q))
+      )
     },
     kpiCards() {
       const totalPayments = (this.todayStats.mpesa || 0) + (this.todayStats.cash || 0)
@@ -1944,15 +2028,41 @@ export default {
       try {
         if (!this.user?.uid) {
           this.subActive = false
+          this.planTier = 'free'
+          this.proStatus = false
           return
         }
         const { data } = await apiClient.get(`/subscriptions/status?firebase_uid=${this.user.uid}`)
         this.subData = data
         this.subActive = data?.is_active === true
+
+        // Prefer plan from subscription status when available
+        const planName = (
+          data?.subscription?.plan ||
+          data?.subscription?.tier ||
+          data?.plan ||
+          data?.tier ||
+          ''
+        ).toString().trim().toLowerCase()
+        if (planName === 'pro' || planName === 'professional') {
+          this.planTier = 'pro'
+          this.proStatus = this.subActive
+        } else if (planName === 'business') {
+          this.planTier = 'business'
+          this.proStatus = false
+        } else if (planName === 'starter') {
+          this.planTier = 'starter'
+          this.proStatus = false
+        } else if (!this.subActive) {
+          this.planTier = 'free'
+          this.proStatus = false
+        }
       } catch (e) {
         console.error('Subscription check error:', e)
         this.subActive = false
         this.subData = null
+        this.planTier = 'free'
+        this.proStatus = false
       } finally {
         this.subLoading = false
       }
@@ -1960,15 +2070,37 @@ export default {
 
     SelectionChange(branchName) {
       if (!branchName) return
-      const branch = this.branches.find(b => b.name === branchName)
-      if (!branch) return
 
       // Reset all dashboard data before loading the new branch
       this.resetDashboardData()
 
+      if (branchName === 'All Branches') {
+        this.isConsolidated = true
+        this.selectedBranch = 'All Branches'
+        this.branchId = 0
+        this.refreshAll()
+        return
+      }
+
+      const branch = this.branches.find(b => b.name === branchName)
+      if (!branch) return
+
+      this.isConsolidated = false
       this.selectedBranch = branchName
       this.branchId = branch.id
       this.refreshAll()
+    },
+
+    handleCloseDayClick() {
+      if (!this.subActive) {
+        this.$router.push('/subscription')
+        return
+      }
+      if (this.isConsolidated) {
+        this.showSnackbar('Select a specific branch to close the business day', 'warning')
+        return
+      }
+      this.openCloseDay()
     },
 
     resetDashboardData() {
@@ -2038,20 +2170,29 @@ export default {
       try {
         await this.loadUserProfile()
 
-        // Load branches for Pro subscribers; auto-select if empty
-        if (this.proStatus === true) {
+        // Load branches only for Pro (multi-branch plan feature)
+        if (this.canUseMultiBranch) {
           await this.loadBranches()
+        } else {
+          // Starter / Business: single branch only
+          this.isConsolidated = false
+          this.branches = []
         }
 
-        // Load branch-specific stats only when a branch is chosen
-        if (this.branchId) {
+        if (this.isConsolidated && this.branches.length > 0) {
+          // Consolidated multi-branch view — load entries first so today-stats can reuse them
+          await this.loadConsolidatedRecentEntries()
           await Promise.all([
-           
-            // console.log(`Previous 7 days: ${JSON.stringify(this.get7DaysBefore(moment(new Date()).format('YYYY-MM-DD')))}`),
+            this.loadConsolidatedStats(),
+            this.loadConsolidatedTodayStats(),
+          ])
+        } else if (this.branchId) {
+          // Single branch view
+          await Promise.all([
             this.loadStats(),
             this.loadRecentEntries(),
             this.loadLastEntry(),
-             this.loadExpensesForDate7(this.get7DaysBefore(moment(new Date()).format('YYYY-MM-DD'))),
+            this.loadExpensesForDate7(this.get7DaysBefore(moment(new Date()).format('YYYY-MM-DD'))),
             this.loadExpensesForDate30(this.get30DaysBefore(moment(new Date()).format('YYYY-MM-DD'))),
           ])
         }
@@ -2202,6 +2343,179 @@ get30DaysBefore(date) {
       }
     },
 
+    // ── Consolidated Multi-Branch Loaders ─────────────────────────
+    async loadConsolidatedStats() {
+      try {
+        const branchIds = this.branches.map(b => b.id)
+        const results = await Promise.all(
+          branchIds.map(async (id) => {
+            try {
+              const [last, week, month] = await Promise.all([
+                this.apiCall('get', `/daily-operations/last?branch_id=${id}`),
+                this.apiCall('get', `/reports/last-7-days?branch_id=${id}`),
+                this.apiCall('get', `/reports/month-to-date?branch_id=${id}`),
+              ])
+              return { last, week, month }
+            } catch (err) {
+              console.warn(`Stats failed for branch ${id}`, err)
+              return null
+            }
+          })
+        )
+
+        const valid = results.filter(Boolean)
+
+        let lastActual = 0, lastExpected = 0, lastCost = 0, lastCogs = 0
+        let weekActual = 0, weekExpected = 0, weekCost = 0, weekCogs = 0
+        let monthActual = 0, monthExpected = 0, monthCost = 0, monthCogs = 0
+
+        valid.forEach(({ last, week, month }) => {
+          lastActual += parseFloat(last?.actualRevenue || last?.totalRevenue) || 0
+          lastExpected += parseFloat(last?.expectedRevenue || last?.totalRevenue) || 0
+          lastCost += parseFloat(last?.totalCost || last?.totalExpenses) || 0
+          lastCogs += parseFloat(last?.cogs || last?.totalCogs) || 0
+
+          weekActual += parseFloat(week?.totalActualRevenue || week?.totalRevenue) || 0
+          weekExpected += parseFloat(week?.totalRevenue) || 0
+          weekCost += parseFloat(week?.totalCost || week?.totalExpenses) || 0
+          weekCogs += parseFloat(week?.totalCogs) || 0
+
+          monthActual += parseFloat(month?.totalActualRevenue || month?.totalRevenue) || 0
+          monthExpected += parseFloat(month?.totalRevenue) || 0
+          monthCost += parseFloat(month?.totalCost || month?.totalExpenses) || 0
+          monthCogs += parseFloat(month?.totalCogs) || 0
+        })
+
+        this.stats.last = {
+          revenue: lastExpected,
+          actualRevenue: lastActual,
+          cost: lastCost,
+          cogs: lastCogs,
+          expenses: lastCost,
+          margin: lastActual - lastCost,
+        }
+        this.stats.week = {
+          revenue: weekExpected,
+          actualRevenue: weekActual,
+          cost: weekCost,
+          cogs: weekCogs,
+          expenses: weekCost,
+          margin: weekActual - weekCost,
+        }
+        this.stats.month = {
+          revenue: monthExpected,
+          actualRevenue: monthActual,
+          cost: monthCost,
+          cogs: monthCogs,
+          expenses: monthCost,
+          margin: monthActual - monthCost,
+        }
+      } catch (e) {
+        console.error('Consolidated stats error', e)
+      }
+    },
+
+    async loadConsolidatedRecentEntries() {
+      try {
+        const allEntries = []
+        await Promise.all(
+          this.branches.map(async (branch) => {
+            try {
+              const entries = await this.apiCall('get', `/daily-operations?branch_id=${branch.id}`)
+              ;(entries || []).forEach((e) => {
+                allEntries.push({
+                  ...e,
+                  branch_id: branch.id,
+                  branch_name: branch.name,
+                })
+              })
+            } catch (err) {
+              console.warn(`Entries failed for branch ${branch.id}`, err)
+            }
+          })
+        )
+
+        // Sort by date descending, then branch name
+        allEntries.sort((a, b) => {
+          const dateCmp = moment(b.date).valueOf() - moment(a.date).valueOf()
+          if (dateCmp !== 0) return dateCmp
+          return (a.branch_name || '').localeCompare(b.branch_name || '')
+        })
+
+        this.recentEntries = Object.freeze(allEntries)
+        this.todayEntryTime = null
+        this.isEditing = false
+      } catch (e) {
+        console.error('Consolidated entries error', e)
+      }
+    },
+
+    async loadConsolidatedTodayStats() {
+      try {
+        const today = moment().format('YYYY-MM-DD')
+        let totalExpected = 0
+        let totalActual = 0
+        let totalCash = 0
+        let totalMpesa = 0
+        let totalExpenses = 0
+        let totalCogs = 0
+        let totalWaste = 0
+
+        await Promise.all(
+          this.branches.map(async (branch) => {
+            try {
+              const entry = this.recentEntries.find(
+                (e) => e.branch_id === branch.id && e.date === today
+              ) || await this.apiCall('get', `/daily-operations/last?branch_id=${branch.id}`).catch(() => null)
+
+              if (!entry || entry.date !== today) return
+
+              const expected = parseFloat(entry.revenue) || 0
+              const cash = parseFloat(entry.payment_cash) || 0
+              const mpesa = parseFloat(entry.payment_mpesa) || 0
+              const actual = cash + mpesa
+              const cogs = (parseFloat(entry.sold_kg) || 0) * (parseFloat(entry.cost_per_kg) || 0)
+              const waste = parseFloat(entry.waste_kg) || 0
+
+              totalExpected += expected
+              totalActual += actual
+              totalCash += cash
+              totalMpesa += mpesa
+              totalCogs += cogs
+              totalWaste += waste
+
+              try {
+                const expData = await this.apiCall('get', `/expenses/${today}?branch_id=${branch.id}`)
+                totalExpenses += parseFloat(expData?.totalPaid) || 0
+              } catch (_) {}
+            } catch (err) {
+              console.warn(`Today stats failed for branch ${branch.id}`, err)
+            }
+          })
+        )
+
+        const netProfit = totalActual - totalExpenses
+        this.total_expenses = totalExpenses
+        this.todayStats = {
+          revenue: totalExpected,
+          actualRevenue: totalActual,
+          paymentCash: totalCash,
+          paymentMpesa: totalMpesa,
+          revenueVariance: totalExpected - totalActual,
+          profit: netProfit,
+          expectedProfit: totalExpected - totalExpenses,
+          marginPct: totalActual ? ((netProfit / totalActual) * 100).toFixed(1) : 0,
+          wasteKg: totalWaste,
+          mpesa: totalMpesa,
+          cash: totalCash,
+          totalExpenses: totalExpenses,
+          cogs: totalCogs,
+        }
+      } catch (e) {
+        console.error('Consolidated today stats error', e)
+      }
+    },
+
     async loadUserProfile() {
       try {
         if (!this.user?.uid) return
@@ -2209,10 +2523,21 @@ get30DaysBefore(date) {
         this.userProfile = data
         console.log(data)
 
-        if (data.subscription === 'pro') {
-          this.proStatus = true;
-        }else {
-          this.proStatus = false;
+        // Normalize plan name from users.subscription / plans.name
+        // plans table: starter | pro | Business
+        const raw = (data.subscription || data.plan || '').toString().trim().toLowerCase()
+        if (raw === 'pro' || raw === 'professional') {
+          this.planTier = 'pro'
+          this.proStatus = true
+        } else if (raw === 'business') {
+          this.planTier = 'business'
+          this.proStatus = false
+        } else if (raw === 'starter') {
+          this.planTier = 'starter'
+          this.proStatus = false
+        } else {
+          this.planTier = 'free'
+          this.proStatus = false
         }
 
         if (data.business_name) this.shopName = data.business_name
@@ -2235,16 +2560,25 @@ get30DaysBefore(date) {
         this.branches = data || []
         console.log('Branches loaded:', this.branches)
 
+        // Preserve consolidated mode if already active
+        if (this.isConsolidated) {
+          this.selectedBranch = 'All Branches'
+          this.branchId = 0
+          return
+        }
+
         // Auto-select first branch if selector is currently empty
         if (!this.selectedBranch && this.branches.length > 0) {
           const first = this.branches[0]
           this.selectedBranch = first.name
           this.branchId = first.id
+          this.isConsolidated = false
         } else if (this.branchId && this.branches.length) {
           // Sync the dropdown label to the currently active branchId
           const current = this.branches.find(b => b.id === this.branchId)
           if (current) {
             this.selectedBranch = current.name
+            this.isConsolidated = false
           }
         }
       } catch (e) {
@@ -2470,6 +2804,15 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
       this.snackbar = { show: true, text, color }
     },
     editEntry(item) {
+      // If in consolidated view, switch to the entry's branch first
+      if (this.isConsolidated && item.branch_id) {
+        const branch = this.branches.find(b => b.id === item.branch_id)
+        if (branch) {
+          this.isConsolidated = false
+          this.selectedBranch = branch.name
+          this.branchId = branch.id
+        }
+      }
       this.searchDate2 = item.date
       this.populateForm(item)
       this.openCloseDay()
@@ -2485,8 +2828,8 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 
   watch: {
     selectedBranch(newVal, oldVal) {
-      // If user clears the selector, reload branches and auto-select first one
-      if (!newVal && oldVal && this.subData?.subscription?.tier === 'pro') {
+      // If user clears the selector, reload branches and auto-select first one (Pro only)
+      if (!newVal && oldVal && this.canUseMultiBranch) {
         this.loadBranches()
       }
     },

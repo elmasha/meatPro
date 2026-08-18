@@ -28,14 +28,20 @@ export default async function ({ app, route, redirect }) {
         params: { firebase_uid: user.uid }
       })
 
-      // If not active, or not on a PRO plan, send them to the subscription page
+      // Allow access if active and has required plan/features
       const planName = (data.subscription?.plan_name || '').toLowerCase()
+      const isPro = planName === 'pro'
+      const isBusiness = planName === 'business'
+      const isStarter = planName === 'starter'
       
-      if (!data.is_active) {
+      if (!data.is_active && !isStarter) {
         return redirect('/subscription?reason=expired')
       }
       
-      if (planName !== 'pro') {
+      // Basic reports available to all active users
+      // Advance reports might need Business or Pro
+      // For now, we allow access to the page and handle gating inside
+      if (!isPro && !isBusiness && !isStarter) {
         return redirect('/subscription?reason=upgrade_required')
       }
 
