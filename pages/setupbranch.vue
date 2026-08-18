@@ -356,14 +356,6 @@
 <script>
 import api from '../services/api'
 
-// Plan → max branches (matches plans table features)
-const PLAN_LIMITS = {
-  free: 0,
-  starter: 1,      // "1 branch"
-  pro: 3,          // "Up to 3 branches"
-  business: 1,     // "1 branch"
-}
-
 export default {
   layout: 'public',
   name: 'SetupBranch',
@@ -386,41 +378,135 @@ export default {
       snackbar: { show: false, text: '', color: 'success' },
       authUnsubscribe: null,
       branchCount: 0,
+
+      // Plans loaded from API
+      plans: [],
+      plansLoaded: false,
     }
   },
 
   computed: {
+    // Dynamically resolve limit from the loaded plan’s features
     branchLimit() {
-      return PLAN_LIMITS[this.planName] ?? 0
+      if (!this.plansLoaded || !this.plans.length) {
+        // Fallback while plans are loading (or if API fails)
+        return this.getFallbackLimit(this.planName)
+      }
+
+      const plan = this.plans.find(p => {
+        const key = (p.slug || p.name || p.code || p.id || '').toString().toLowerCase()
+        return key === this.planName || key.includes(this.planName)
+      })
+
+      if (!plan) return this.getFallbackLimit(this.planName)
+
+      return this.extractBranchLimit(plan)
     },
+
     branchLimitLabel() {
       return this.branchLimit === Infinity ? '∞' : String(this.branchLimit)
     },
+
     remainingSlots() {
       if (this.branchLimit === Infinity) return Infinity
       return Math.max(0, this.branchLimit - this.branches.length)
     },
+
     atLimit() {
       if (this.branchLimit === Infinity) return false
       return this.branches.length >= this.branchLimit
     },
+
     canCreate() {
       return this.isPro && this.businessId && !this.atLimit
     },
+
     planDisplayName() {
       const map = { free: 'Free', starter: 'Starter', pro: 'Professional', business: 'Business' }
       return map[this.planName] || 'Free'
     },
+
     planLabel() {
       return this.planDisplayName
     },
+
     planColor() {
-      const map = { free: 'grey darken-1', starter: 'blue darken-2', pro: 'red darken-2', business: 'purple darken-2' }
+      const map = {
+        free: 'grey darken-1',
+        starter: 'blue darken-2',
+        pro: 'red darken-2',
+        business: 'purple darken-2',
+      }
       return map[this.planName] || 'grey darken-1'
     },
   },
 
   methods: {
+    // ---------- Plans ----------
+    async loadPlans() {
+      try {
+        const { data } = await api.get('/plans')          // adjust endpoint if needed
+        this.plans = Array.isArray(data) ? data : (data?.plans || data?.data || [])
+        console.log('Plans loaded:', this.plans)
+      } catch (e) {
+        console.error('Failed to load plans:', e)
+        this.plans = []
+      } finally {
+        this.plansLoaded = true
+      }
+    },
+
+    /**
+     * Extract the numeric branch limit from a plan object.
+     * Supports many common shapes used in SaaS plans tables.
+     */
+    extractBranchLimit(plan) {
+      // 1. Direct fields
+      if (typeof plan.max_branches === 'number') return plan.max_branches
+      if (typeof plan.branch_limit === 'number') return plan.branch_limit
+      if (typeof plan.branches === 'number') return plan.branches
+
+      // 2. Features array (most common)
+      const features = plan.features || plan.feature_list || []
+      for (const f of features) {
+        const name = (f.name || f.key || f.slug || f.code || '').toString().toLowerCase()
+        const value = f.value ?? f.limit ?? f.quantity ?? f.count
+
+        if (
+          name.includes('branch') ||
+          name === 'branches' ||
+          name === 'max_branches' ||
+          name === 'branch_limit'
+        ) {
+          if (value === null || value === undefined) continue
+          if (typeof value === 'number') return value
+          if (typeof value === 'string') {
+            const lower = value.toLowerCase()
+            if (lower.includes('unlimited') || lower === '∞' || lower === 'inf') return Infinity
+            const num = parseInt(value.replace(/[^0-9]/g, ''), 10)
+            if (!isNaN(num)) return num
+          }
+          if (value === true) return Infinity          // boolean feature = unlimited
+        }
+      }
+
+      // 3. Fallback string description on the plan itself
+      const desc = (plan.description || plan.features_text || '').toString().toLowerCase()
+      if (desc.includes('unlimited') && desc.includes('branch')) return Infinity
+      const match = desc.match(/(\d+)\s*branch/)
+      if (match) return parseInt(match[1], 10)
+
+      // Ultimate fallback
+      return this.getFallbackLimit(this.planName)
+    },
+
+    getFallbackLimit(planName) {
+      // Keep the old hardcoded values as safety net
+      const FALLBACK = { free: 0, starter: 1, pro: 3, business: 1 }
+      return FALLBACK[planName] ?? 0
+    },
+
+    // ---------- Branches ----------
     async loadBranches() {
       try {
         if (!this.uid) return
@@ -445,52 +531,53 @@ export default {
       })
     },
 
+    // ---------- Profile (now also loads plans) ----------
     async loadUserProfile() {
       try {
         if (!this.uid) return
-        const { data } = await api.get(`/users/${this.uid}/profile`)
 
-        console.log('User profile loaded:', data)
-        // Resolve plan name from various possible fields
-        const rawPlan = (
-          data.subscription ||
-          data.plan ||
-          data.subscription_status ||
-          'free'
-        ).toString().toLowerCase()
-
-        if (['pro', 'professional'].includes(rawPlan) || data.subscription === 'pro') {
-          this.planName = 'pro'
-          this.isPro = true
-        } else if (['starter'].includes(rawPlan)) {
-          this.planName = 'starter'
-          this.isPro = true
-        } else if (['business'].includes(rawPlan)) {
-          this.planName = 'business'
-          this.isPro = true
-        } else if (data.subscription_status === 'active' && data.subscription) {
-          // Active but unknown name — treat as pro-capable
-          this.planName = data.subscription.toLowerCase()
-          this.isPro = true
-        } else {
-          this.planName = 'free'
-          this.isPro = false
-        }
-
-        if (data.business_id) {
-          this.businessId = data.business_id
-        }
-
-        if (data.branch_id) {
-          this.primaryBranchId = data.branch_id
-        }
-
-        await this.loadBranches()
+        // Load plans in parallel with profile
+        await Promise.all([this.loadPlans(), this._loadProfileOnly()])
       } catch (e) {
-        console.error('Profile load error:', e)
+        console.error('Profile / plans load error:', e)
       } finally {
         this.profileLoaded = true
       }
+    },
+
+    async _loadProfileOnly() {
+      const { data } = await api.get(`/users/${this.uid}/profile`)
+      console.log('User profile loaded:', data)
+
+      // Resolve plan name
+      const rawPlan = (
+        data.subscription ||
+        data.plan ||
+        data.subscription_status ||
+        'free'
+      ).toString().toLowerCase()
+
+      if (['pro', 'professional'].includes(rawPlan) || data.subscription === 'pro') {
+        this.planName = 'pro'
+        this.isPro = true
+      } else if (['starter'].includes(rawPlan)) {
+        this.planName = 'starter'
+        this.isPro = true
+      } else if (['business'].includes(rawPlan)) {
+        this.planName = 'business'
+        this.isPro = true
+      } else if (data.subscription_status === 'active' && data.subscription) {
+        this.planName = data.subscription.toLowerCase()
+        this.isPro = true
+      } else {
+        this.planName = 'free'
+        this.isPro = false
+      }
+
+      if (data.business_id) this.businessId = data.business_id
+      if (data.branch_id) this.primaryBranchId = data.branch_id
+
+      await this.loadBranches()
     },
 
     showSnackbar(text, color = 'success') {
@@ -665,7 +752,7 @@ export default {
         this.$router.push('/login')
       } else {
         this.uid = user.uid
-        this.loadUserProfile()
+        this.loadUserProfile()          // now loads both profile + plans
       }
     })
   },
