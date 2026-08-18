@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="auth-page">
     <!-- Animated Background -->
     <div class="ambient-bg">

@@ -592,8 +592,28 @@
                   <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'view')" title="View User">
                     <v-icon small color="red darken-2">mdi-eye</v-icon>
                   </v-btn>
-                  <v-btn icon small class="action-btn-hover" @click="openUserDialog(item, 'edit')" title="Edit User">
+                  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'edit')" title="Edit User">
                     <v-icon small color="red darken-2">mdi-pencil</v-icon>
+                  </v-btn>
+                  <v-btn
+                    icon
+                    small
+                    class="action-btn-hover mr-1"
+                    color="success"
+                    @click="startTrial(item)"
+                    title="Start 30-day Trial"
+                  >
+                    <v-icon small>mdi-calendar-clock</v-icon>
+                  </v-btn>
+                  <v-btn
+                    icon
+                    small
+                    class="action-btn-hover"
+                    color="error"
+                    @click="deleteUser(item)"
+                    title="Delete User"
+                  >
+                    <v-icon small>mdi-delete</v-icon>
                   </v-btn>
                 </template>
               </v-data-table>
@@ -1427,6 +1447,45 @@ export default {
         this.fetchUsers()
       } catch (err) {
         this.showSnackbar(err.response?.data?.error || 'Update failed', 'error')
+      }
+    },
+
+    // ==================== NEW: DELETE USER ====================
+    async deleteUser(item) {
+      if (!confirm(`Are you sure you want to permanently delete "${item.name || 'this user'}"?\n\nThis will also remove their payments and subscriptions.`)) {
+        return
+      }
+
+      try {
+        await api.delete(`/admin/users/${item.id}`)
+        this.showSnackbar('User deleted successfully')
+        this.fetchUsers()
+        this.fetchStats()
+      } catch (err) {
+        this.showSnackbar(
+          err.response?.data?.error || 'Failed to delete user',
+          'error'
+        )
+      }
+    },
+
+    // ==================== NEW: START 30-DAY TRIAL ====================
+    async startTrial(item) {
+      if (!confirm(`Put "${item.name || 'this user'}" on a 30-day free trial?`)) {
+        return
+      }
+
+      try {
+        const { data } = await api.post(`/admin/users/${item.id}/trial`, { days: 30 })
+        this.showSnackbar(data.message || 'Trial started successfully')
+        this.fetchUsers()
+        this.fetchStats()
+        this.fetchSubscriptions()
+      } catch (err) {
+        this.showSnackbar(
+          err.response?.data?.error || 'Failed to start trial',
+          'error'
+        )
       }
     },
 

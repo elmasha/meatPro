@@ -379,83 +379,99 @@ export default {
 
   methods: {
     async StkQuery() {
-      if (!this.CheckoutRequestID) return;
-      this.timerCount = 25;
-      this.timerEnabled = false;
+  if (!this.CheckoutRequestID) return;
+  this.timerCount = 25;
+  this.timerEnabled = false;
 
-      this.showSnackbar('Checking payment status...', 'success');
+  this.showSnackbar('Checking payment status...', 'info');
 
+  try {
+    const response = await apiClient.post(`/subscriptions/query`, {
+      checkout_request_id: this.CheckoutRequestID,
+    });
+
+    const data = response.data || {};
+    const resultCode = String(data.result_code ?? '');
+    const resultDesc = data.result_desc || '';
+    const mpesaStatus = data.mpesa_status;
+
+    // SUCCESS
+    if (resultCode === '0') {
+      this.paymentDialog = false;
+      this.showSnackbar('Payment successful! Pro features activated.', 'success');
+
+      // Refresh subscription data, then hard-reload the page
       try {
-        const response = await apiClient.post(`/subscriptions/query`, {
-          checkout_request_id: this.CheckoutRequestID,
-        });
-        const mpesaStatus = response.data.mpesa_status;
-        const details = response.data || {};
-        const resultCode = response.data.result_code;
-        const resultDesc = response.data.result_desc ;
-
-
-
-        // this.showSuccess(response.data.ResultDesc || "Payment status received.");
-        if (response.data.result_code === "0") {
-          this.paymentDialog = false;
-          this.message = null;
-         this.showSnackbar('Payment successful! Pro features activated.', 'success');
-          return;
-        }
-
-        // CANCELLED by user
-        if (resultCode === "1032") {
-
-          this.showSnackbar("You cancelled the payment on your phone. No money was deducted.",  "warning");
-          this.paymentDialog = false;
-          return;
-        }
-
-        // WRONG PIN
-        if (resultCode === "2001") {
-          this.showSnackbar("You entered the wrong M-Pesa PIN. Please try again.", "warning");
-          this.paymentDialog = false;
-          return;
-        }
-
-        // INSUFFICIENT BALANCE
-        if ( resultCode === "1") {
-          this.showSnackbar( "Your M-Pesa balance is too low for this transaction.", "warning");
-
-          this.paymentDialog = false;
-          return;
-        }
-
-        // INVALID NUMBER
-        if (resultCode === "1001") {
-          this.showSnackbar("The phone number format is incorrect.", "warning");
-          this.paymentDialog = false;
-          return;
-        }
-
-        // TIMEOUT
-        if ( resultCode === "1002") {
-          this.showSnackbar("The M-Pesa request timed out. Please check if you received the prompt and try again.", "warning");
-          this.paymentDialog = false;
-          return;
-        }
-
-        // FAILED
-        if (mpesaStatus === "failed") {
-          this.showSnackbar( resultDesc || "The payment could not be completed. Please try again.", "warning");
-          this.paymentDialog = false;
-          return;
-        }
- console.log("StkQuery response:", response.data);
-
-      } catch (error) {
-        console.error("StkQuery error:", error);
-        this.timerCount = 25;
-        this.timerEnabled = false;
-        this.showError("Could not confirm query. Please try again.");
+        await this.loadStatus();
+        await this.loadPayments();
+      } catch (e) {
+        console.error(e);
       }
-    },
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+      return;
+    }
+
+    // CANCELLED by user
+    if (resultCode === '1032') {
+      this.showSnackbar('You cancelled the payment on your phone. No money was deducted.', 'warning');
+      this.paymentDialog = false;
+      return;
+    }
+
+    // WRONG PIN
+    if (resultCode === '2001') {
+      this.showSnackbar('You entered the wrong M-Pesa PIN. Please try again.', 'warning');
+      this.paymentDialog = false;
+      return;
+    }
+
+    // INSUFFICIENT BALANCE
+    if (resultCode === '1') {
+      this.showSnackbar('Your M-Pesa balance is too low for this transaction.', 'warning');
+      this.paymentDialog = false;
+      return;
+    }
+
+    // INVALID NUMBER
+    if (resultCode === '1001') {
+      this.showSnackbar('The phone number format is incorrect.', 'warning');
+      this.paymentDialog = false;
+      return;
+    }
+
+    // TIMEOUT
+    if (resultCode === '1002') {
+      this.showSnackbar('The M-Pesa request timed out. Please check if you received the prompt and try again.', 'warning');
+      this.paymentDialog = false;
+      return;
+    }
+
+    // FAILED
+    if (mpesaStatus === 'failed') {
+      this.showSnackbar(resultDesc || 'The payment could not be completed. Please try again.', 'warning');
+      this.paymentDialog = false;
+      return;
+    }
+
+    // Still pending — restart the wait timer and query again
+    if (mpesaStatus === 'pending' || resultCode === '' || resultCode === '1037') {
+      this.showSnackbar('Still waiting for M-Pesa confirmation...', 'info');
+      this.timerCount = 25;
+      this.timerEnabled = true;
+      return;
+    }
+
+    console.log('StkQuery response:', data);
+  } catch (error) {
+    console.error('StkQuery error:', error);
+    this.timerCount = 25;
+    this.timerEnabled = false;
+    this.showSnackbar('Could not confirm payment. Please try again.', 'error');
+  }
+},
     formatNumber(val) { return numeral(val || 0).format('0,0'); },
     formatDate(date) { return date ? moment(date).format('MMM D, YYYY') : 'N/A'; },
     parseFeatures(featuresJson) {

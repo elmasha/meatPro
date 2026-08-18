@@ -93,7 +93,7 @@
                   v-for="b in branches"
                   :key="b.id"
                   class="branch-item"
-                  :class="{ 'branch-primary': b.id === primaryBranchId, 'branch-selecting': selectingId === b.id }"
+                  :class="{ 'branch-primary': b.id === primaryBranchId, 'branch-selecting': selectingId === b.id || deletingId === b.id }"
                   @click="setPrimaryBranch(b)"
                 >
                   <div class="d-flex align-center">
@@ -125,25 +125,40 @@
                         {{ b.location || 'No location' }}
                       </div>
                     </div>
+
+                    <!-- Loading spinner when selecting or deleting -->
                     <v-progress-circular
-                      v-if="selectingId === b.id"
+                      v-if="selectingId === b.id || deletingId === b.id"
                       indeterminate
                       size="20"
                       width="2"
                       color="red"
                       class="ml-2"
                     />
-                    <v-icon
-                      v-else-if="b.id === primaryBranchId"
-                      color="red lighten-2"
-                      small
-                      class="ml-2"
-                    >
-                      mdi-check-circle
-                    </v-icon>
-                    <v-icon v-else color="grey darken-1" small class="ml-2">
-                      mdi-chevron-right
-                    </v-icon>
+                    <template v-else>
+                      <v-icon
+                        v-if="b.id === primaryBranchId"
+                        color="red lighten-2"
+                        small
+                        class="ml-2"
+                      >
+                        mdi-check-circle
+                      </v-icon>
+                      <v-icon v-else color="grey darken-1" small class="ml-2">
+                        mdi-chevron-right
+                      </v-icon>
+
+                      <!-- Delete button -->
+                      <v-btn
+                        icon
+                        x-small
+                        color="grey darken-1"
+                        class="ml-1 delete-btn"
+                        @click.stop="confirmDelete(b)"
+                      >
+                        <v-icon small>mdi-delete-outline</v-icon>
+                      </v-btn>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -285,6 +300,47 @@
       </v-row>
     </v-container>
 
+    <!-- Delete Confirmation Dialog -->
+    <v-dialog v-model="deleteDialog" max-width="400" persistent>
+      <v-card class="glass-card rounded-2xl" dark>
+        <v-card-title class="text-h6 font-weight-bold pt-5 px-5">
+          Delete Branch?
+        </v-card-title>
+        <v-card-text class="px-5 pb-2">
+          <p class="mb-2">
+            Are you sure you want to permanently delete
+            <strong class="white--text">“{{ branchToDelete?.name }}”</strong>?
+          </p>
+          <p class="text-caption grey--text mb-0">
+            This action cannot be undone.
+            <span v-if="branchToDelete?.id === primaryBranchId">
+              This is your primary branch — another branch will be set as primary automatically.
+            </span>
+          </p>
+        </v-card-text>
+        <v-card-actions class="px-5 pb-5">
+          <v-spacer />
+          <v-btn
+            text
+            color="grey lighten-1"
+            class="text-capitalize"
+            @click="deleteDialog = false"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="red darken-2"
+            dark
+            class="text-capitalize rounded-lg"
+            :loading="!!deletingId"
+            @click="deleteBranch"
+          >
+            Delete
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="4000" bottom rounded="lg" class="mb-4">
       <div class="d-flex align-center">
@@ -303,9 +359,9 @@ import api from '../services/api'
 // Plan → max branches (matches plans table features)
 const PLAN_LIMITS = {
   free: 0,
-  starter: 1,
-  pro: 3,
-  business: Infinity,
+  starter: 1,      // "1 branch"
+  pro: 3,          // "Up to 3 branches"
+  business: 1,     // "1 branch"
 }
 
 export default {
@@ -316,6 +372,9 @@ export default {
     return {
       loading: false,
       selectingId: null,
+      deletingId: null,
+      deleteDialog: false,
+      branchToDelete: null,
       uid: null,
       businessId: null,
       isPro: false,
@@ -326,6 +385,7 @@ export default {
       branch: { name: '', location: '' },
       snackbar: { show: false, text: '', color: 'success' },
       authUnsubscribe: null,
+      branchCount: 0,
     }
   },
 
@@ -366,7 +426,8 @@ export default {
         if (!this.uid) return
         const { data } = await api.get(`/branches/my?firebase_uid=${this.uid}`)
         this.branches = data || []
-        console.log('Branches loaded:', this.branches)
+        this.branchCount = this.branches.length
+        console.log('Branches loaded:', this.branches, 'Count:', this.branchCount)
       } catch (e) {
         console.error('Branches load error:', e)
         this.branches = []
@@ -389,6 +450,7 @@ export default {
         if (!this.uid) return
         const { data } = await api.get(`/users/${this.uid}/profile`)
 
+        console.log('User profile loaded:', data)
         // Resolve plan name from various possible fields
         const rawPlan = (
           data.subscription ||
@@ -437,7 +499,7 @@ export default {
 
     async setPrimaryBranch(b) {
       if (!b || b.id === this.primaryBranchId) return
-      if (this.selectingId) return
+      if (this.selectingId || this.deletingId) return
 
       this.selectingId = b.id
       try {
@@ -464,6 +526,61 @@ export default {
         }
       } finally {
         this.selectingId = null
+      }
+    },
+
+    confirmDelete(b) {
+      if (!b || this.deletingId || this.selectingId) return
+      this.branchToDelete = b
+      this.deleteDialog = true
+    },
+
+    async deleteBranch() {
+      if (!this.branchToDelete || !this.uid) return
+
+      const target = this.branchToDelete
+      this.deletingId = target.id
+      this.deleteDialog = false
+
+      try {
+        await api.delete(`/branches/${target.id}`, {
+          params: { firebase_uid: this.uid },
+        })
+
+        // Remove from local list
+        this.branches = this.branches.filter((b) => b.id !== target.id)
+        this.branchCount = this.branches.length
+
+        // If we deleted the primary branch, promote another one (or clear)
+        if (this.primaryBranchId === target.id) {
+          if (this.branches.length > 0) {
+            // Automatically set the first remaining branch as primary
+            await this.setPrimaryBranch(this.branches[0])
+          } else {
+            // No branches left — clear primary on the server
+            try {
+              await api.patch(`/users/${this.uid}/profile`, { branch_id: null })
+            } catch (e) {
+              try {
+                await api.put(`/users/${this.uid}/profile`, { branch_id: null })
+              } catch (e2) {
+                console.error('Failed to clear primary branch:', e2)
+              }
+            }
+            this.primaryBranchId = null
+          }
+        }
+
+        this.showSnackbar(`“${target.name}” deleted successfully`, 'success')
+      } catch (error) {
+        console.error('Delete branch error:', error)
+        this.showSnackbar(
+          error.response?.data?.message || 'Failed to delete branch',
+          'error'
+        )
+      } finally {
+        this.deletingId = null
+        this.branchToDelete = null
       }
     },
 
@@ -698,6 +815,19 @@ export default {
   min-width: 0;
 }
 
+.delete-btn {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.branch-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  color: #ef5350 !important;
+}
+
 /* Modern Inputs */
 .modern-input >>> .v-input__slot {
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
@@ -757,5 +887,9 @@ export default {
 
 .rounded-xl {
   border-radius: 16px !important;
+}
+
+.rounded-2xl {
+  border-radius: 20px !important;
 }
 </style>
