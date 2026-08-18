@@ -1042,10 +1042,19 @@ export default {
 <style scoped>
 .reports-page {
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
   padding: 24px;
   background: #f8f9fa;
   min-height: 100vh;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+@media (max-width: 600px) {
+  .reports-page {
+    padding: 12px;
+  }
 }
 
 /* Header */
@@ -1203,9 +1212,11 @@ export default {
 /* Cards Grid */
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
   gap: 16px;
   margin-bottom: 20px;
+  width: 100%;
+  min-width: 0;
 }
 
 .metric-card {
@@ -1378,10 +1389,15 @@ export default {
   grid-template-columns: 2fr 1fr;
   gap: 16px;
   margin-bottom: 20px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
-  .charts-row { grid-template-columns: 1fr; }
+  .charts-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .chart-card {
@@ -1390,6 +1406,11 @@ export default {
   padding: 20px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   border: 1px solid #f3f4f6;
+  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .chart-header {
@@ -1425,38 +1446,51 @@ export default {
   color: #6b7280;
 }
 
-/* Bar Chart */
+/* Bar Chart — flexible for desktop, WebView & mobile */
 .bar-chart {
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  gap: 24px;
+  justify-content: flex-start;
+  gap: clamp(6px, 1.5vw, 20px);
   height: 200px;
-  padding: 20px 0;
+  min-height: 160px;
+  padding: 16px 4px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .bar-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  flex: 1;
-  max-width: 80px;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: clamp(28px, 8vw, 56px);
+  min-width: 28px;
+  max-width: 56px;
 }
 
 .bar-label {
-  font-size: 12px;
+  font-size: clamp(9px, 2.2vw, 12px);
   color: #9ca3af;
   font-weight: 500;
+  line-height: 1.2;
 }
 
 .bar-track {
-  width: 40px;
-  height: 140px;
+  width: clamp(14px, 4.5vw, 36px);
+  height: clamp(100px, 28vw, 140px);
+  max-height: 140px;
   background: #f3f4f6;
   border-radius: 8px 8px 4px 4px;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .bar-fill {
@@ -1472,8 +1506,10 @@ export default {
 .bar-item.loss .bar-fill { background: #ef4444; }
 
 .bar-value {
-  font-size: 12px;
+  font-size: clamp(9px, 2vw, 12px);
   font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .bar-value.positive { color: #16a34a; }
@@ -1486,6 +1522,107 @@ export default {
   margin-top: 12px;
   font-size: 12px;
   color: #6b7280;
+  flex-wrap: wrap;
+}
+
+.chart-body {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Tablet / narrow WebView */
+@media (max-width: 900px) {
+  .bar-chart {
+    height: 180px;
+    gap: clamp(6px, 1.8vw, 14px);
+  }
+
+  .bar-item {
+    width: clamp(30px, 7vw, 48px);
+  }
+
+  .bar-track {
+    width: clamp(16px, 4vw, 28px);
+    height: 120px;
+  }
+}
+
+/* Phone / small WebView */
+@media (max-width: 600px) {
+  .chart-card {
+    padding: 14px 12px;
+  }
+
+  .chart-header {
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chart-header h3 {
+    font-size: 14px;
+  }
+
+  .chart-subtitle {
+    font-size: 11px;
+  }
+
+  .bar-chart {
+    height: 160px;
+    padding: 10px 2px 8px;
+    gap: 8px;
+  }
+
+  .bar-item {
+    width: 32px;
+    min-width: 32px;
+    max-width: 36px;
+    gap: 4px;
+  }
+
+  .bar-track {
+    width: 18px;
+    height: 110px;
+  }
+
+  .bar-label {
+    font-size: 10px;
+  }
+
+  .bar-value {
+    font-size: 9px;
+  }
+
+  .chart-legend {
+    gap: 12px;
+    font-size: 11px;
+    margin-top: 8px;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 380px) {
+  .bar-chart {
+    height: 140px;
+    gap: 6px;
+  }
+
+  .bar-item {
+    width: 28px;
+    min-width: 28px;
+  }
+
+  .bar-track {
+    width: 14px;
+    height: 95px;
+  }
+
+  .bar-label,
+  .bar-value {
+    font-size: 9px;
+  }
 }
 
 .dot {
