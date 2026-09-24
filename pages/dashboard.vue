@@ -9,7 +9,7 @@
       color="white"
     >
       <div class="pa-6 pb-4">
-        <div class="d-flex align-center cursor-pointer" @click="$router.push('/')">
+        <div class="d-flex align-center cursor-pointer" @click="$router.push('/dashboard')">
           <div class="logo-container mr-3">
             <v-avatar color="red darken-2" size="44">
               <v-icon color="white" size="22">mdi-food-steak</v-icon>
@@ -49,10 +49,9 @@
 
       <template v-slot:append>
         <div class="pa-4 pb-6">
-          <!-- Setup Branches button for Pro users -->
           <v-slide-y-transition>
             <v-btn
-              v-if="canUseMultiBranch"
+              v-if="canManageBranches"
               block
               color="red darken-2"
               dark
@@ -63,7 +62,6 @@
               Setup Branches
             </v-btn>
           </v-slide-y-transition>
-            
 
           <v-card class="rounded-xl pa-3 red lighten-5" elevation="0">
             <div class="d-flex align-center mb-2">
@@ -102,7 +100,7 @@
                   <v-icon>mdi-menu</v-icon>
                 </v-btn>
                 <div>
-                  <div class="d-flex align-center">
+                  <div class="d-flex align-center flex-wrap">
                     <h1 class="text-h6 text-sm-h5 font-weight-bold grey--text text--darken-3">
                       {{ formattedToday }}
                     </h1>
@@ -114,27 +112,38 @@
                     >
                       {{ isConsolidated ? 'All Branches' : `Branch ${branchId || '—'}` }}
                     </v-chip>
+                    <v-chip
+                      v-if="role"
+                      x-small
+                      :color="isOwner ? 'purple lighten-5' : 'blue lighten-5'"
+                      :text-color="isOwner ? 'purple darken-2' : 'blue darken-2'"
+                      class="ml-1 font-weight-bold hidden-xs-only"
+                      label
+                    >
+                      <v-icon x-small left>
+                        {{ isOwner ? 'mdi-account-star' : 'mdi-account-tie' }}
+                      </v-icon>
+                      {{ isOwner ? 'Owner' : 'Manager' }}
+                    </v-chip>
                   </div>
                   <div class="d-flex align-center mt-1">
                     <v-icon x-small color="grey" class="mr-1">mdi-map-marker</v-icon>
                     <span class="text-caption grey--text text--darken-1">{{ shopName }} </span>
                   </div>
-
                 </div>
               </div>
             </v-col>
             <v-col cols="4" sm="6" class="d-flex justify-end align-center">
               <v-btn
-              v-if="canUseMultiBranch"
-              color="red darken-2"
-              dark
-              icon
-              class="rounded-xl text-capitalize font-weight-bold mb-0"
-              to="/setupbranch"
-            >
-              <v-icon left small>mdi-store-plus</v-icon>
-              
-            </v-btn>
+                v-if="canManageBranches"
+                color="red darken-2"
+                dark
+                icon
+                class="rounded-xl text-capitalize font-weight-bold mb-0"
+                to="/setupbranch"
+              >
+                <v-icon left small>mdi-store-plus</v-icon>
+              </v-btn>
               <v-btn
                 icon
                 outlined
@@ -172,6 +181,9 @@
                     <div class="text-body-2 font-weight-bold grey--text text--darken-2">
                       {{ userName }}
                     </div>
+                    <div v-if="role" class="text-caption grey--text mt-1">
+                      {{ isOwner ? 'Business Owner' : 'Branch Manager' }}
+                    </div>
                   </div>
                   <v-divider class="mb-1" />
                   <v-list-item to="/profile" class="rounded-lg mx-1">
@@ -195,7 +207,7 @@
       </div>
 
       <v-container :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
-        <!-- SUBSCRIPTION BANNER: shown when inactive -->
+        <!-- SUBSCRIPTION BANNER -->
         <v-slide-y-transition>
           <v-alert
             v-if="!subActive && !subLoading"
@@ -216,12 +228,13 @@
                   Subscription Required
                 </div>
                 <div class="text-body-2 grey--text text--darken-1">
-                  {{ subData?.subscription?.status === 'cancelled' 
-                    ? 'Your subscription was cancelled. Renew to continue recording daily entries.' 
+                  {{ subData?.subscription?.status === 'cancelled'
+                    ? 'Your subscription was cancelled. Renew to continue recording daily entries.'
                     : 'Activate a Starter, Business, or Pro plan to record daily stock, sales, and expenses.' }}
                 </div>
               </div>
               <v-btn
+                v-if="isOwner"
                 small
                 color="red darken-2"
                 dark
@@ -231,6 +244,29 @@
                 <v-icon left small>mdi-crown</v-icon>
                 {{ subData?.subscription?.status === 'cancelled' ? 'Renew Now' : 'Activate Now' }}
               </v-btn>
+            </div>
+          </v-alert>
+        </v-slide-y-transition>
+
+        <!-- Manager role notice -->
+        <v-slide-y-transition>
+          <v-alert
+            v-if="role === 'manager' && subActive"
+            dense
+            type="info"
+            class="mb-4 mb-sm-6 rounded-xl"
+            text
+            border="left"
+            colored-border
+            elevation="1"
+          >
+            <div class="d-flex align-center">
+              <v-icon color="info" small class="mr-2">mdi-information</v-icon>
+              <span class="text-body-2">
+                You're signed in as a <strong>Branch Manager</strong>.
+                You can record daily entries for your branch.
+                Contact your business owner for administrative changes.
+              </span>
             </div>
           </v-alert>
         </v-slide-y-transition>
@@ -266,8 +302,8 @@
           </v-alert>
         </v-slide-y-transition>
 
-        <!-- Branch Selector Bar -->
-        <v-row v-if="canUseMultiBranch && branches.length > 1" dense class="mb-2 reveal-card">
+        <!-- Branch Selector Bar (owner with 2+ branches) -->
+        <v-row v-if="canSwitchBranches" dense class="mb-2 reveal-card">
           <v-col cols="12">
             <v-card class="rounded-xl pa-3 d-flex align-center" elevation="1" outlined>
               <v-icon small color="grey darken-1" class="mr-3">mdi-store</v-icon>
@@ -297,7 +333,7 @@
               </v-chip>
               <v-spacer />
               <v-btn
-                v-if="canUseMultiBranch"
+                v-if="canManageBranches"
                 small
                 text
                 color="red darken-2"
@@ -354,96 +390,6 @@
           </v-col>
         </v-row>
 
-        <!-- Profit Breakdown Waterfall -->
-        <v-row dense class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 200ms">
-          <v-col cols="12">
-            <v-card class="rounded-xl pa-4 pa-sm-5" elevation="1">
-              <div class="d-flex align-center mb-4">
-                <v-avatar color="purple lighten-5" size="36" class="mr-3">
-                  <v-icon color="purple darken-2">mdi-chart-waterfall</v-icon>
-                </v-avatar>
-                <div>
-                  <div class="text-h6 font-weight-bold grey--text text--darken-2">
-                    Profit Breakdown
-                  </div>
-                  <div class="text-caption grey--text">How revenue becomes profit</div>
-                </div>
-              </div>
-
-              <!-- Waterfall Bars -->
-              <div class="waterfall-container">
-                <!-- Revenue Bar -->
-                <div class="waterfall-row">
-                  <div class="waterfall-label">
-                    <v-icon x-small color="green" class="mr-1">mdi-plus-circle</v-icon>
-                    Revenue
-                  </div>
-                  <div class="waterfall-bar-wrapper">
-                    <div class="waterfall-bar green-bar" :style="{ width: '100%' }">
-                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.revenue) }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- COGS Bar -->
-                <div class="waterfall-row">
-                  <div class="waterfall-label">
-                    <v-icon x-small color="grey" class="mr-1">mdi-minus-circle</v-icon>
-                    COGS (Meat Cost)
-                  </div>
-                  <div class="waterfall-bar-wrapper">
-                    <div class="waterfall-bar grey-bar" :style="{ width: profitBreakdown.revenue > 0 ? Math.min((profitBreakdown.cogs / profitBreakdown.revenue) * 100, 100) + '%' : '0%' }">
-                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.cogs) }}</span>
-                    </div>
-                    <span class="waterfall-pct">{{ profitBreakdown.cogsPct }}%</span>
-                  </div>
-                </div>
-
-                <!-- Gross Profit -->
-                <div class="waterfall-row waterfall-subtotal">
-                  <div class="waterfall-label font-weight-bold">
-                    <v-icon x-small color="blue" class="mr-1">mdi-equal</v-icon>
-                    Gross Profit
-                  </div>
-                  <div class="waterfall-bar-wrapper">
-                    <div class="waterfall-bar blue-bar" :style="{ width: profitBreakdown.revenue > 0 ? Math.max((profitBreakdown.grossProfit / profitBreakdown.revenue) * 100, 0) + '%' : '0%' }">
-                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.grossProfit) }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Expenses Bar -->
-                <div class="waterfall-row">
-                  <div class="waterfall-label">
-                    <v-icon x-small color="orange" class="mr-1">mdi-minus-circle</v-icon>
-                    Operating Expenses
-                  </div>
-                  <div class="waterfall-bar-wrapper">
-                    <div class="waterfall-bar orange-bar" :style="{ width: profitBreakdown.revenue > 0 ? Math.min((profitBreakdown.expenses / profitBreakdown.revenue) * 100, 100) + '%' : '0%' }">
-                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.expenses) }}</span>
-                    </div>
-                    <span class="waterfall-pct">{{ profitBreakdown.expensesPct }}%</span>
-                  </div>
-                </div>
-
-                <!-- Net Profit -->
-                <div class="waterfall-row waterfall-total">
-                  <div class="waterfall-label font-weight-bold">
-                    <v-icon x-small :color="profitBreakdown.netProfit >= 0 ? 'green' : 'red'" class="mr-1">mdi-currency-usd</v-icon>
-                    Net Profit
-                  </div>
-                  <div class="waterfall-bar-wrapper">
-                    <div class="waterfall-bar" :class="profitBreakdown.netProfit >= 0 ? 'green-dark-bar' : 'red-bar'" :style="{ width: profitBreakdown.revenue > 0 ? Math.max((Math.abs(profitBreakdown.netProfit) / profitBreakdown.revenue) * 100, 0) + '%' : '0%' }">
-                      <span class="waterfall-value">{{ formatNumber(profitBreakdown.netProfit) }}</span>
-                    </div>
-                    <span class="waterfall-pct font-weight-bold" :class="profitBreakdown.netProfit >= 0 ? 'green--text' : 'red--text'">{{ profitBreakdown.netMarginPct }}%</span>
-                  </div>
-                </div>
-              </div>
-            </v-card>
-          </v-col>
-        </v-row>
-
         <!-- Revenue Variance Alert -->
         <v-slide-y-transition>
           <v-row v-if="todayStats.revenueVariance && Math.abs(todayStats.revenueVariance) > 1 && todayStats.revenue > 0" class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 150ms">
@@ -468,8 +414,8 @@
                       Revenue Variance: KES {{ formatNumber(Math.abs(todayStats.revenueVariance)) }}
                     </div>
                     <div class="text-body-2 grey--text text--darken-1">
-                      {{ todayStats.revenueVariance > 0 
-                        ? 'Revenue shortfall: Expected revenue exceeds payments received. Check for unrecorded sales, theft, or pricing errors.' 
+                      {{ todayStats.revenueVariance > 0
+                        ? 'Revenue shortfall: Expected revenue exceeds payments received. Check for unrecorded sales, theft, or pricing errors.'
                         : 'Revenue surplus: Great! You collected more than expected. This is normal for nyama choma (extras, tips, rounding).' }}
                     </div>
                   </div>
@@ -485,7 +431,7 @@
           </v-row>
         </v-slide-y-transition>
 
-        <!-- Main Action: LOCKED if no subscription -->
+        <!-- Main Action -->
         <v-row class="mb-4 mb-sm-6 reveal-card" style="animation-delay: 200ms">
           <v-col cols="12">
             <v-hover v-slot="{ hover }">
@@ -493,71 +439,48 @@
                 class="rounded-xl overflow-hidden action-card-modern"
                 elevation="3"
                 :class="{
-                  'action-complete': todayEntryExists && subActive,
-                  'action-pending': !todayEntryExists && subActive,
+                  'action-complete': dateAlreadyEntered && subActive,
+                  'action-pending': !dateAlreadyEntered && subActive,
                   'action-locked': !subActive,
-                  'elevation-8': hover && !todayEntryExists && subActive,
+                  'elevation-8': hover && !dateAlreadyEntered && subActive,
                 }"
               >
                 <v-card-text class="pa-0">
                   <v-btn
                     block
                     x-large
-                    :color="!subActive || isConsolidated ? 'grey lighten-3' : todayEntryExists ? 'grey lighten-3' : 'red darken-2'"
-                    :dark="subActive && !todayEntryExists && !isConsolidated"
+                    :color="getActionButtonColor"
+                    :dark="subActive && !dateAlreadyEntered && !isConsolidated"
                     elevation="0"
                     class="rounded-0 py-6 py-sm-7 action-btn-modern"
                     @click="handleCloseDayClick"
+                    :disabled="dateAlreadyEntered && !isConsolidated && subActive"
                   >
                     <div class="d-flex align-center justify-center w-100 px-4">
                       <v-avatar
-                        :color="!subActive || isConsolidated ? 'grey' : todayEntryExists ? 'grey' : 'white'"
+                        :color="getActionAvatarColor"
                         size="52"
                         class="mr-4 action-avatar"
                       >
                         <v-icon
-                          :color="!subActive || isConsolidated ? 'white' : todayEntryExists ? 'white' : 'red darken-2'"
+                          :color="getActionIconColor"
                           size="28"
                         >
-                          {{ !subActive ? 'mdi-lock' : isConsolidated ? 'mdi-view-dashboard-variant' : todayEntryExists ? 'mdi-check-circle' : 'mdi-store-check' }}
+                          {{ getCloseButtonIcon }}
                         </v-icon>
                       </v-avatar>
                       <div class="text-left flex-grow-1">
                         <div class="text-h6 text-sm-h5 font-weight-bold">
-                          {{
-                            !subActive 
-                              ? 'Activate Subscription to Record' 
-                              : isConsolidated
-                                ? 'Select a Branch to Close Day'
-                                : todayEntryExists 
-                                  ? "Today's Entry Complete" 
-                                  : 'Close Business Day'
-                          }}
+                          {{ getActionButtonText }}
                         </div>
                         <div
                           class="text-caption mt-1"
-                          :class="
-                            !subActive || isConsolidated
-                              ? 'grey--text' 
-                              : todayEntryExists 
-                                ? 'grey--text' 
-                                : 'red--text text--lighten-4'
-                          "
+                          :class="getActionSubtitleColor"
                         >
-                          {{
-                            !subActive
-                              ? 'Activate a plan to unlock daily stock & sales recording'
-                              : isConsolidated
-                                ? 'Switch to a specific branch to record daily stock, sales & expenses'
-                                : todayEntryExists
-                                  ? `Recorded at ${todayEntryTime}`
-                                  : 'Record stock, sales & expenses to lock in your daily numbers'
-                          }}
+                          {{ getActionSubtitle }}
                         </div>
                       </div>
-                      <v-icon v-if="!subActive" large class="ml-2">mdi-arrow-right</v-icon>
-                      <v-icon v-else-if="isConsolidated" large class="ml-2">mdi-arrow-right</v-icon>
-                      <v-icon v-else-if="!todayEntryExists" large class="ml-2">mdi-arrow-right</v-icon>
+                      <v-icon v-if="!subActive || isConsolidated || !dateAlreadyEntered" large class="ml-2">mdi-arrow-right</v-icon>
                       <v-chip
                         v-else
                         small
@@ -609,24 +532,16 @@
                 <template v-slot:default>
                   <thead>
                     <tr>
-                      <th
-                        class="text-left text-subtitle-2 font-weight-medium grey--text text--darken-1"
-                      >
+                      <th class="text-left text-subtitle-2 font-weight-medium grey--text text--darken-1">
                         Period
                       </th>
-                      <th
-                        class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1"
-                      >
+                      <th class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1">
                         Revenue
                       </th>
-                      <th
-                        class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1"
-                      >
+                      <th class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1">
                         Total Cost (Expenses)
                       </th>
-                      <th
-                        class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1"
-                      >
+                      <th class="text-right text-subtitle-2 font-weight-medium grey--text text--darken-1">
                         Net Profit
                       </th>
                     </tr>
@@ -701,14 +616,9 @@
                     background-color="grey lighten-3"
                   />
                   <div class="text-caption grey--text mt-2 d-flex align-center">
-                    <v-icon
-                      x-small
-                      :color="wasteAlert ? 'red' : 'green'"
-                      class="mr-1"
-                      >{{
-                        wasteAlert ? 'mdi-alert-circle' : 'mdi-check-circle'
-                      }}</v-icon
-                    >
+                    <v-icon x-small :color="wasteAlert ? 'red' : 'green'" class="mr-1">{{
+                      wasteAlert ? 'mdi-alert-circle' : 'mdi-check-circle'
+                    }}</v-icon>
                     {{
                       wasteAlert
                         ? 'Above 5% threshold — investigate immediately'
@@ -800,7 +710,7 @@
                       {{ isConsolidated ? 'All Branches – Recent Entries' : 'Recent Entries' }}
                     </div>
                     <div class="text-caption grey--text">
-                      {{ isConsolidated ? `Combined view across ${branches.length} branches` : 'Last 30 days of business records' }}
+                      {{ isConsolidated ? `Combined view across ${branches.length} branches` : 'Last 180 days of business records' }}
                     </div>
                   </div>
                 </div>
@@ -867,7 +777,7 @@
                 </template>
                 <template v-slot:item.actual_revenue="{ item }">
                   <span class="font-weight-bold text-body-2 purple--text text--darken-2">{{
-                    formatNumber((parseFloat(item.payment_cash) || 0) + (parseFloat(item.payment_mpesa) || 0))
+                    formatNumber(item.actual_revenue)
                   }}</span>
                 </template>
                 <template v-slot:item.revenue="{ item }">
@@ -877,7 +787,7 @@
                 </template>
                 <template v-slot:item.total_cost="{ item }">
                   <span class="text-body-2 grey--text">{{
-                    formatNumber((parseFloat(item.sold_kg) || 0) * (parseFloat(item.cost_per_kg) || 0))
+                    formatNumber(item.cogs)
                   }}</span>
                 </template>
                 <template v-slot:item.profit="{ item }">
@@ -898,12 +808,13 @@
                   <v-btn
                     icon
                     x-small
-                    color="grey lighten-1"
+                    color="grey darken-1"
                     class="hover-red"
                     @click="editEntry(item)"
                     :disabled="!subActive || isConsolidated"
+                    title="View entry"
                   >
-                    <v-icon x-small>mdi-pencil</v-icon>
+                    <v-icon x-small>mdi-eye</v-icon>
                   </v-btn>
                 </template>
                 <template v-slot:no-data>
@@ -923,7 +834,7 @@
                       <v-icon left>mdi-plus</v-icon> Add First Entry
                     </v-btn>
                     <v-btn
-                      v-else
+                      v-else-if="isOwner"
                       color="red darken-2"
                       dark
                       class="rounded-lg text-capitalize"
@@ -954,14 +865,27 @@
         <span>Home</span>
         <v-icon>mdi-home</v-icon>
       </v-btn>
-      <v-btn @click="handleCloseDayClick">
-        <span>Close</span>
-        <v-icon>{{ !subActive ? 'mdi-lock' : isConsolidated ? 'mdi-view-dashboard-variant' : 'mdi-plus-circle' }}</v-icon>
+
+      <v-btn
+        @click="handleCloseDayClick"
+        class="close-nav-btn"
+        :disabled="dateAlreadyEntered && !isConsolidated && subActive"
+      >
+        <span>{{ getCloseButtonText }}</span>
+        <v-icon>{{ getCloseButtonIcon }}</v-icon>
+        <v-badge
+          v-if="dateAlreadyEntered && subActive && !isConsolidated"
+          color="green"
+          dot
+          class="close-badge"
+        ></v-badge>
       </v-btn>
+
       <v-btn to="/reports">
         <span>Reports</span>
         <v-icon>mdi-chart-line</v-icon>
       </v-btn>
+
       <v-btn @click="logout">
         <span>Exit</span>
         <v-icon>mdi-logout</v-icon>
@@ -1004,10 +928,9 @@
         </v-list>
         <v-divider class="my-4" />
 
-        <!-- Setup Branches for Pro users only -->
         <v-slide-y-transition>
           <v-btn
-            v-if="canUseMultiBranch"
+            v-if="canManageBranches"
             block
             color="red darken-2"
             dark
@@ -1045,7 +968,7 @@
         :class="nav_bars ? '' : 'overflow-hidden'"
       >
         <v-toolbar
-          color="red darken-2"
+          :color="formReadOnly ? 'grey darken-2' : 'red darken-2'"
           dark
           flat
           height="70"
@@ -1055,7 +978,7 @@
             <v-icon>mdi-close</v-icon>
           </v-btn>
           <v-toolbar-title class="text-h6 font-weight-bold">
-            {{ isEditing ? 'Edit Entry' : 'Close Business Day' }}
+            {{ formReadOnly ? 'View Entry (Read Only)' : (isEditing ? 'Edit Entry' : 'Close Business Day') }}
           </v-toolbar-title>
           <v-spacer />
           <v-menu
@@ -1064,6 +987,7 @@
             transition="scale-transition"
             offset-y
             min-width="auto"
+            :disabled="formReadOnly"
           >
             <template v-slot:activator="{ on, attrs }">
               <v-chip
@@ -1092,6 +1016,7 @@
             dark
             class="hidden-sm-and-up mr-2"
             @click="mobileDatePicker = true"
+            :disabled="formReadOnly"
           >
             <v-icon small>mdi-calendar</v-icon>
           </v-btn>
@@ -1115,22 +1040,30 @@
               ></v-date-picker>
             </v-card>
           </v-dialog>
-          <v-btn
-            text
-            dark
-            class="text-capitalize font-weight-bold rounded-lg"
-            @click="saveDailyEntry"
-            :loading="saving"
-          >
-            Save
-          </v-btn>
+          <v-tooltip bottom :disabled="formValid && !formReadOnly">
+            <template v-slot:activator="{ on, attrs }">
+              <div v-bind="attrs" v-on="on">
+                <v-btn
+                  text
+                  dark
+                  class="text-capitalize font-weight-bold rounded-lg"
+                  @click="saveDailyEntry"
+                  :loading="saving"
+                  :disabled="!formValid || formReadOnly"
+                >
+                  Save
+                </v-btn>
+              </div>
+            </template>
+            <span>{{ formReadOnly ? 'Entry already recorded — cannot edit' : formValidationMessage }}</span>
+          </v-tooltip>
         </v-toolbar>
 
         <v-card-text class="pa-4 pa-sm-6 bg-grey-lighten-4 dialog-content-modern">
           <!-- Date Alert -->
           <v-slide-y-transition>
             <v-alert
-              v-if="!isToday"
+              v-if="!isToday && !formReadOnly"
               dense
               text
               type="info"
@@ -1139,6 +1072,35 @@
               colored-border
             >
               You are recording for <strong>{{ formattedSelectedDate }}</strong>
+            </v-alert>
+          </v-slide-y-transition>
+
+          <!-- Locked Warning Banner -->
+          <v-slide-y-transition>
+            <v-alert
+              v-if="formReadOnly"
+              dense
+              type="info"
+              class="mb-4 rounded-xl"
+              text
+              border="left"
+              colored-border
+              elevation="2"
+            >
+              <div class="d-flex align-center flex-wrap">
+                <v-avatar color="blue lighten-5" size="40" class="mr-3 hidden-xs-only">
+                  <v-icon color="blue darken-2">mdi-lock</v-icon>
+                </v-avatar>
+                <div class="flex-grow-1">
+                  <div class="text-body-1 font-weight-bold grey--text text--darken-2">
+                    Entry Already Recorded
+                  </div>
+                  <div class="text-body-2 grey--text text--darken-1">
+                    This date has already been captured and cannot be edited.
+                    Records are final once saved.
+                  </div>
+                </div>
+              </div>
             </v-alert>
           </v-slide-y-transition>
 
@@ -1180,6 +1142,8 @@
                       class="rounded-lg mb-3"
                       :hint="lastClosingHint"
                       persistent-hint
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="6" md="3">
@@ -1193,6 +1157,8 @@
                       dense
                       hide-details
                       class="rounded-lg mb-3"
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="6" md="3">
@@ -1206,6 +1172,8 @@
                       dense
                       hide-details
                       class="rounded-lg mb-3"
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="6" md="3">
@@ -1220,6 +1188,8 @@
                       hide-details
                       class="rounded-lg mb-3"
                       @input="calculateSold"
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                 </v-row>
@@ -1235,12 +1205,14 @@
                       dense
                       hide-details
                       class="rounded-lg"
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="6" md="3">
                     <v-text-field
                       v-model="form.selling_price_per_kg"
-                      label="Selling Price"
+                      label="Target Price"
                       prefix="KES"
                       type="number"
                       outlined
@@ -1248,6 +1220,10 @@
                       dense
                       hide-details
                       class="rounded-lg"
+                      hint="Your planned selling price per kg"
+                      persistent-hint
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="12" md="6" class="d-flex align-center justify-center py-2 py-md-0">
@@ -1282,6 +1258,8 @@
                       dense
                       hide-details
                       class="rounded-lg"
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="6">
@@ -1295,12 +1273,14 @@
                       dense
                       hide-details
                       class="rounded-lg"
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                 </v-row>
-                <!-- Expected vs Actual Revenue -->
+
                 <v-row dense class="mt-4">
-                  <v-col cols="6">
+                  <v-col cols="12" md="4">
                     <v-card class="pa-4 rounded-xl green lighten-5" elevation="0">
                       <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
                         Expected Revenue
@@ -1309,40 +1289,54 @@
                         {{ formatNumber(expectedRevenue) }}
                       </div>
                       <div class="text-caption grey--text mt-1">
-                        {{ volumeSold }} kg × KES {{ form.selling_price_per_kg }}
+                        {{ volumeSold }} kg × KES {{ form.selling_price_per_kg }} (target)
                       </div>
                     </v-card>
                   </v-col>
-                  <v-col cols="6">
+                  <v-col cols="12" md="4">
                     <v-card class="pa-4 rounded-xl purple lighten-5" elevation="0">
                       <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
                         Actual Revenue
                       </div>
                       <div class="text-h5 font-weight-bold purple--text text--darken-2">
-                        {{ formatNumber((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) }}
+                        {{ formatNumber(actualRevenue) }}
                       </div>
                       <div class="text-caption grey--text mt-1">
                         Cash + M-Pesa payments
                       </div>
                     </v-card>
                   </v-col>
+                  <v-col cols="12" md="4">
+                    <v-card class="pa-4 rounded-xl blue lighten-5" elevation="0">
+                      <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
+                        Actual Price / kg
+                      </div>
+                      <div class="text-h5 font-weight-bold blue--text text--darken-2">
+                        KES {{ actualPricePerKg }}
+                      </div>
+                      <div class="text-caption mt-1" :class="priceDeltaClass">
+                        {{ priceDeltaText }}
+                      </div>
+                    </v-card>
+                  </v-col>
                 </v-row>
+
                 <!-- Variance Alert -->
                 <v-alert
-                  v-if="Math.abs(expectedRevenue - ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0))) > 1"
+                  v-if="Math.abs(expectedRevenue - actualRevenue) > 1"
                   dense
                   text
-                  :type="expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'warning' : 'info'"
+                  :type="expectedRevenue > actualRevenue ? 'warning' : 'info'"
                   class="mt-4 rounded-xl"
                   border="left"
                   colored-border
                 >
                   <div class="d-flex justify-space-between align-center">
                     <span class="font-weight-medium">
-                      Variance: KES {{ formatNumber(Math.abs(expectedRevenue - ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)))) }}
+                      Variance: KES {{ formatNumber(Math.abs(expectedRevenue - actualRevenue)) }}
                     </span>
                     <span class="text-caption grey--text">
-                      {{ expectedRevenue > ((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) ? 'Expected > Received (shortfall)' : 'Received > Expected (surplus ✓)' }}
+                      {{ expectedRevenue > actualRevenue ? 'Expected > Received (shortfall)' : 'Received > Expected (surplus ✓)' }}
                     </span>
                   </div>
                 </v-alert>
@@ -1361,6 +1355,7 @@
                       dense
                       hide-details
                       class="rounded-lg"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="5">
@@ -1374,6 +1369,8 @@
                       dense
                       hide-details
                       class="rounded-lg"
+                      autocomplete="off"
+                      :disabled="formReadOnly"
                     />
                   </v-col>
                   <v-col cols="2" class="text-center">
@@ -1385,6 +1382,7 @@
                       elevation="2"
                       class="rounded-lg"
                       @click="addExpenseInline"
+                      :disabled="formReadOnly"
                     >
                       <v-icon>mdi-plus</v-icon>
                     </v-btn>
@@ -1400,14 +1398,10 @@
                     <template v-slot:default>
                       <thead class="grey lighten-4">
                         <tr>
-                          <th
-                            class="text-left text-body-2 font-weight-medium grey--text text--darken-1 py-3"
-                          >
+                          <th class="text-left text-body-2 font-weight-medium grey--text text--darken-1 py-3">
                             Item
                           </th>
-                          <th
-                            class="text-right text-body-2 font-weight-medium grey--text text--darken-1 py-3"
-                          >
+                          <th class="text-right text-body-2 font-weight-medium grey--text text--darken-1 py-3">
                             Amount
                           </th>
                           <th class="text-right py-3" style="width: 50px"></th>
@@ -1429,6 +1423,7 @@
                               color="grey lighten-1"
                               class="hover-red"
                               @click="removeExpense(i)"
+                              :disabled="formReadOnly"
                             >
                               <v-icon x-small>mdi-close</v-icon>
                             </v-btn>
@@ -1481,9 +1476,7 @@
             </div>
             <v-row dense class="text-center">
               <v-col cols="3">
-                <div
-                  class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
-                >
+                <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
                   Expected Revenue
                 </div>
                 <div class="text-h6 text-sm-h5 font-weight-bold grey--text text--darken-3">
@@ -1491,19 +1484,15 @@
                 </div>
               </v-col>
               <v-col cols="3">
-                <div
-                  class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
-                >
+                <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
                   Actual Revenue
                 </div>
                 <div class="text-h6 text-sm-h5 font-weight-bold purple--text text--darken-2">
-                  {{ formatNumber((parseFloat(form.payment_cash) || 0) + (parseFloat(form.payment_mpesa) || 0)) }}
+                  {{ formatNumber(actualRevenue) }}
                 </div>
               </v-col>
               <v-col cols="3">
-                <div
-                  class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
-                >
+                <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
                   COGS
                 </div>
                 <div class="text-h6 text-sm-h5 font-weight-bold grey--text text--darken-3">
@@ -1511,9 +1500,7 @@
                 </div>
               </v-col>
               <v-col cols="3">
-                <div
-                  class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1"
-                >
+                <div class="text-caption grey--text text--darken-1 text-uppercase font-weight-bold tracking-wide mb-1">
                   Net Profit
                 </div>
                 <div
@@ -1531,21 +1518,28 @@
           </v-card>
         </v-card-text>
 
-        <v-card-actions class="pa-4 pa-sm-6 pt-0 bg-grey-lighten-4">
+        <v-card-actions class="pa-4 pa-sm-6 pt-0 bg-grey-lighten-4 flex-column">
+          <div
+            v-if="!formValid || formReadOnly"
+            class="text-caption grey--text text--darken-1 mb-2 text-center"
+          >
+            <v-icon x-small color="warning" class="mr-1">mdi-alert-circle-outline</v-icon>
+            {{ formReadOnly ? 'This entry has already been recorded and cannot be edited.' : formValidationMessage }}
+          </div>
           <v-btn
             block
             x-large
-            color="red darken-2"
-            dark
+            :color="formReadOnly ? 'grey lighten-3' : 'red darken-2'"
+            :dark="!formReadOnly"
             elevation="2"
             class="rounded-xl text-capitalize font-weight-bold"
             @click="saveDailyEntry"
             :loading="saving"
-            :disabled="volumeSold < 0"
+            :disabled="!formValid || formReadOnly"
             height="56"
           >
-            <v-icon left>mdi-content-save</v-icon>
-            {{ isEditing ? 'Update Record' : 'Close Day & Save' }}
+            <v-icon left>{{ formReadOnly ? 'mdi-lock' : 'mdi-content-save' }}</v-icon>
+            {{ formReadOnly ? 'Entry Locked — Already Recorded' : (isEditing ? 'Update Record' : 'Close Day & Save') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -1565,7 +1559,16 @@
             <template v-slot:default>
               <tbody>
                 <tr v-for="(row, i) in confirmRows" :key="i" class="confirm-row">
-                  <td class="text-body-2 grey--text py-3">{{ row.label }}</td>
+                  <td class="text-body-2 grey--text py-3">
+                    <div>{{ row.label }}</div>
+                    <div
+                      v-if="row.breakdown"
+                      class="text-caption grey--text text--darken-1"
+                      style="font-size: 11px; font-weight: 400; line-height: 1.3;"
+                    >
+                      {{ row.breakdown }}
+                    </div>
+                  </td>
                   <td
                     class="text-right text-body-2 font-weight-bold py-3"
                     :class="row.class || ''"
@@ -1652,7 +1655,6 @@
 <script>
 import moment from 'moment'
 import numeral from 'numeral'
-import axios from 'axios'
 import apiClient from '../services/api'
 
 export default {
@@ -1668,11 +1670,13 @@ export default {
       subActive: false,
       subData: null,
       userProfile: null,
-      // Plan tier from plans table: 'free' | 'starter' | 'business' | 'pro'
       planTier: 'free',
+      // ── Role ───────────────────────────────────────────────────
+      role: null,
+      isOwner: false,
+      accessibleBranchIds: [],
       // ── Existing Data ───────────────────────────────────────────
-
-      proStatus: false, // true only for pro (multi-branch / consolidated)
+      proStatus: false,
       branches: [],
       isConsolidated: false,
       nav_bars: false,
@@ -1695,6 +1699,7 @@ export default {
       selectedBranch: null,
       dialogDateMenu: false,
       mobileDatePicker: false,
+
       stats: {
         last: { revenue: 0, cost: 0, margin: 0 },
         week: { revenue: 0, cost: 0, margin: 0 },
@@ -1715,10 +1720,10 @@ export default {
         supply_kg: '',
         waste_kg: '',
         closing_stock_kg: '',
-        cost_per_kg: 420,
-        selling_price_per_kg: 650,
-        payment_cash: 0,
-        payment_mpesa: 0,
+        cost_per_kg: '',
+        selling_price_per_kg: '',
+        payment_cash: '',
+        payment_mpesa: '',
       },
       expenseForm: { title: '', amount: '' },
       todayExpenses: [],
@@ -1755,20 +1760,27 @@ export default {
     userInitials() {
       return this.userName.substring(0, 2).toUpperCase()
     },
-    // ── Feature flags aligned with plans table ─────────────────
-    // starter: 1 branch, basic stock, limited history
-    // business: 1 branch, full stock/sales/expenses/COGS/daily closing/profit
-    // pro: up to 3 branches, consolidated reporting, advanced analytics
     canRecordDaily() {
-      // Any active paid plan can close day / record stock & sales
       return this.subActive === true
     },
-    canUseMultiBranch() {
-      // Only Pro: multi-branch, setup branches, consolidated view
-      return this.planTier === 'pro' && this.subActive
+
+    // ── Role + Plan gated capabilities ─────────────────────────
+    // Owner on ANY active plan can reach /setupbranch (limit enforced by backend)
+    canManageBranches() {
+      return this.isOwner && this.subActive
     },
+
+    // Show the branch switcher only when the owner has 2+ branches
+    canSwitchBranches() {
+      return this.canManageBranches && this.branches.length > 1
+    },
+
+    // Legacy alias for template buttons
+    canUseMultiBranch() {
+      return this.canManageBranches
+    },
+
     canViewAdvancedReports() {
-      // Business + Pro get full/advanced reports; starter is limited
       return this.subActive && (this.planTier === 'business' || this.planTier === 'pro')
     },
     planDisplayName() {
@@ -1820,9 +1832,41 @@ export default {
       return this.volumeSold * (parseFloat(this.form.cost_per_kg) || 0)
     },
     expectedProfit() {
-      // ✅ Option B: Net Profit = Revenue - Expenses only (COGS NOT subtracted)
       return this.expectedRevenue - this.todayExpenseTotal
     },
+
+    // ── Actual Revenue & Actual Price / kg ─────────────────────
+    actualRevenue() {
+      return (parseFloat(this.form.payment_cash) || 0) + (parseFloat(this.form.payment_mpesa) || 0)
+    },
+    actualPricePerKg() {
+      if (!this.volumeSold) return '0.00'
+      return (this.actualRevenue / this.volumeSold).toFixed(2)
+    },
+    priceDelta() {
+      const target = parseFloat(this.form.selling_price_per_kg) || 0
+      const actual = parseFloat(this.actualPricePerKg) || 0
+      if (!this.volumeSold || !target) return 0
+      return actual - target
+    },
+    priceDeltaText() {
+      if (!this.volumeSold || !this.form.selling_price_per_kg) {
+        return 'Enter volume & target price'
+      }
+      const d = this.priceDelta
+      if (Math.abs(d) < 0.5) {
+        return `On target (KES ${parseFloat(this.form.selling_price_per_kg).toFixed(2)})`
+      }
+      if (d > 0) return `+KES ${d.toFixed(2)} above target`
+      return `−KES ${Math.abs(d).toFixed(2)} below target`
+    },
+    priceDeltaClass() {
+      if (!this.volumeSold) return 'grey--text'
+      const d = this.priceDelta
+      if (Math.abs(d) < 0.5) return 'green--text text--darken-2'
+      return d > 0 ? 'green--text text--darken-2' : 'red--text text--darken-2'
+    },
+
     todayExpenseTotal() {
       return this.todayExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0)
     },
@@ -1846,6 +1890,52 @@ export default {
       if (this.isConsolidated) return false
       return this.recentEntries.some((e) => e.date === this.searchDate2)
     },
+
+    // ── Form Validation ────────────────────────────────────────
+    formValid() {
+      const has = (v) => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v))
+
+      const opening = has(this.form.opening_stock_kg)
+      const supply  = has(this.form.supply_kg)
+      const waste   = has(this.form.waste_kg)
+      const closing = has(this.form.closing_stock_kg)
+      const cost    = has(this.form.cost_per_kg)
+      const target  = has(this.form.selling_price_per_kg)
+      const cash    = has(this.form.payment_cash)
+      const mpesa   = has(this.form.payment_mpesa)
+
+      const volumeOk = this.volumeSold >= 0
+
+      return opening && supply && waste && closing && cost && target && cash && mpesa && volumeOk
+    },
+    formValidationMessage() {
+      if (this.formValid) return ''
+      const has = (v) => v !== '' && v !== null && v !== undefined && !isNaN(parseFloat(v))
+      const missing = []
+      if (!has(this.form.opening_stock_kg)) missing.push('Opening Stock')
+      if (!has(this.form.supply_kg))        missing.push('Supply')
+      if (!has(this.form.waste_kg))         missing.push('Waste')
+      if (!has(this.form.closing_stock_kg)) missing.push('Closing Stock')
+      if (!has(this.form.cost_per_kg))      missing.push('Cost per kg')
+      if (!has(this.form.selling_price_per_kg)) missing.push('Target Price')
+      if (!has(this.form.payment_cash))     missing.push('Cash Payment')
+      if (!has(this.form.payment_mpesa))    missing.push('M-Pesa Payment')
+      if (this.volumeSold < 0)              missing.push('Valid volume')
+      return 'Required: ' + missing.join(', ')
+    },
+    dateAlreadyEntered() {
+      if (this.isConsolidated) return false
+      if (!this.searchDate2) return false
+      return this.recentEntries.some((e) => e.date === this.searchDate2)
+    },
+
+    // ── Hard lock: any date with an entry is read-only ─────────
+    formReadOnly() {
+      if (this.isConsolidated) return true
+      if (!this.searchDate2) return false
+      return this.recentEntries.some((e) => e.date === this.searchDate2)
+    },
+
     mpesaPct() {
       const total = this.todayStats.mpesa + this.todayStats.cash
       return total ? Math.round((this.todayStats.mpesa / total) * 100) : 50
@@ -1856,13 +1946,12 @@ export default {
     avgDailyRevenue() {
       if (!this.recentEntries.length) return 0
       const total = this.recentEntries.reduce((sum, e) => {
-        const actual = (parseFloat(e.payment_cash) || 0) + (parseFloat(e.payment_mpesa) || 0)
+        const actual = parseFloat(e.actual_revenue) || 0
         return sum + actual
       }, 0)
       return total / this.recentEntries.length
     },
     filteredEntries() {
-      // Starter plan: limited historical data (last 14 days)
       let list = this.recentEntries
       if (this.planTier === 'starter') {
         const cutoff = moment().subtract(14, 'days').format('YYYY-MM-DD')
@@ -1875,6 +1964,59 @@ export default {
         (e.branch_name && e.branch_name.toLowerCase().includes(q))
       )
     },
+
+    // ── Close Button Computed Properties ─────────────────────
+    getCloseButtonText() {
+      if (!this.subActive) return 'Locked'
+      if (this.isConsolidated) return 'Select Branch'
+      if (this.dateAlreadyEntered) return 'Completed'
+      return 'Close Day'
+    },
+    getCloseButtonIcon() {
+      if (!this.subActive) return 'mdi-lock'
+      if (this.isConsolidated) return 'mdi-store'
+      if (this.dateAlreadyEntered) return 'mdi-check-circle'
+      return 'mdi-plus-circle'
+    },
+    getActionButtonText() {
+      if (!this.subActive) return 'Activate Subscription to Record'
+      if (this.isConsolidated) return 'Select a Branch to Close Day'
+      if (this.dateAlreadyEntered) return "Today's Entry Complete"
+      return 'Close Business Day'
+    },
+    getActionButtonColor() {
+      if (!this.subActive) return 'grey lighten-3'
+      if (this.isConsolidated) return 'orange lighten-4'
+      if (this.dateAlreadyEntered) return 'grey lighten-3'
+      return 'red darken-2'
+    },
+    getActionAvatarColor() {
+      if (!this.subActive) return 'grey'
+      if (this.isConsolidated) return 'orange'
+      if (this.dateAlreadyEntered) return 'grey'
+      return 'white'
+    },
+    getActionIconColor() {
+      if (!this.subActive) return 'white'
+      if (this.isConsolidated) return 'white'
+      if (this.dateAlreadyEntered) return 'white'
+      return 'red darken-2'
+    },
+    getActionSubtitle() {
+      if (!this.subActive) return this.isOwner
+        ? 'Activate a plan to unlock daily stock & sales recording'
+        : 'Ask your business owner to renew the subscription'
+      if (this.isConsolidated) return 'Switch to a specific branch to record daily stock, sales & expenses'
+      if (this.dateAlreadyEntered) return `Recorded at ${this.todayEntryTime || ''}`
+      return 'Record stock, sales & expenses to lock in your daily numbers'
+    },
+    getActionSubtitleColor() {
+      if (!this.subActive || this.isConsolidated || this.dateAlreadyEntered) {
+        return 'grey--text'
+      }
+      return 'red--text text--lighten-4'
+    },
+
     kpiCards() {
       const totalPayments = (this.todayStats.mpesa || 0) + (this.todayStats.cash || 0)
       const expectedRevenue = this.todayStats.revenue || 0
@@ -1882,22 +2024,10 @@ export default {
       const revenueVariance = this.todayStats.revenueVariance || (expectedRevenue - actualRevenue)
       const hasVariance = Math.abs(revenueVariance) > 1 && expectedRevenue > 0
 
-      // ✅ Get today's expenses - prioritize todayStats which is loaded from the API
       const todayExpenses = this.todayStats?.totalExpenses || this.total_expenses || 0
       const cogs = this.todayStats?.cogs || this.expectedCost || 0
-      const netProfit = actualRevenue - todayExpenses  // Option B: Revenue - Expenses
-      const grossMargin = actualRevenue - cogs  // Revenue - COGS (for info)
+      const netProfit = actualRevenue - todayExpenses
       const marginPct = actualRevenue > 0 ? ((netProfit / actualRevenue) * 100).toFixed(1) : 0
-
-      console.log('💳 kpiCards building:', {
-        total_expenses: this.total_expenses,
-        todayStats_totalExpenses: this.todayStats?.totalExpenses,
-        todayExpenses_array: this.todayExpenses.length,
-        todayExpenses: this.todayExpenses,
-        finalTodayExpenses: todayExpenses,
-        cogs: cogs,
-        netProfit: netProfit
-      })
 
       return [
         {
@@ -1951,14 +2081,13 @@ export default {
       ]
     },
 
-    // New: Profit Breakdown Waterfall
     profitBreakdown() {
-      const revenue = this.todayStats.actualRevenue || 
+      const revenue = this.todayStats.actualRevenue ||
         (this.todayStats.mpesa || 0) + (this.todayStats.cash || 0) ||
         this.todayStats.revenue || 0
       const cogs = this.todayStats?.cogs || this.expectedCost || 0
       const expenses = this.todayStats?.totalExpenses || this.total_expenses || 0
-      const netProfit = revenue - expenses  // Option B
+      const netProfit = revenue - expenses
       const grossProfit = revenue - cogs
 
       return {
@@ -1975,12 +2104,12 @@ export default {
     performanceRows() {
       return [
         {
-          label: 'Yesterday',
+          label: 'Last entry',
           icon: 'mdi-calendar-today',
           iconColor: 'grey',
           revenue: this.stats.last.actualRevenue || this.stats.last.revenue,
-          cost: this.stats.last.cost,           // ✅ TOTAL COST = expenses only
-          cogs: this.stats.last.cogs,           // COGS = meat cost
+          cost: this.stats.last.cost,
+          cogs: this.stats.last.cogs,
           margin: this.stats.last.margin,
         },
         {
@@ -1988,8 +2117,8 @@ export default {
           icon: 'mdi-calendar-week',
           iconColor: 'blue',
           revenue: this.stats.week.actualRevenue || this.stats.week.revenue,
-          cost: this.stats.week.cost,           // ✅ TOTAL COST = expenses only
-          cogs: this.stats.week.cogs,           // COGS = meat cost
+          cost: this.stats.week.cost,
+          cogs: this.stats.week.cogs,
           margin: this.stats.week.margin,
         },
         {
@@ -1997,24 +2126,76 @@ export default {
           icon: 'mdi-calendar-month',
           iconColor: 'red',
           revenue: this.stats.month.actualRevenue || this.stats.month.revenue,
-          cost: this.stats.month.cost,          // ✅ TOTAL COST = expenses only
-          cogs: this.stats.month.cogs,          // COGS = meat cost
+          cost: this.stats.month.cost,
+          cogs: this.stats.month.cogs,
           margin: this.stats.month.margin,
         },
       ]
     },
+
+    // ── Confirm Dialog Rows with kg breakdown ──────────────────
     confirmRows() {
-      const actualRevenue = (parseFloat(this.form.payment_cash) || 0) + (parseFloat(this.form.payment_mpesa) || 0)
-      const revenueVariance = this.expectedRevenue - actualRevenue
+      const targetPrice = parseFloat(this.form.selling_price_per_kg) || 0
+      const actualRate = parseFloat(this.actualPricePerKg) || 0
+      const costPerKg = parseFloat(this.form.cost_per_kg) || 0
+      const vol = this.volumeSold
+      const expenseCount = this.todayExpenses.length
+
       return [
-        { label: 'Volume Sold', value: `${this.volumeSold} kg`, class: 'grey--text text--darken-2' },
-        { label: 'Expected Revenue', value: this.formatNumber(this.expectedRevenue), class: 'grey--text text--darken-2' },
-        { label: 'Actual Revenue', value: this.formatNumber(actualRevenue), class: 'grey--text text--darken-2' },
-        { label: 'Cost of Goods', value: this.formatNumber(this.expectedCost), class: 'grey--text text--darken-2' },
-        { label: 'Expenses', value: this.formatNumber(this.todayExpenseTotal), class: 'grey--text text--darken-2' },
+        {
+          label: 'Volume Sold',
+          value: `${vol} kg`,
+          breakdown: '',
+          class: 'grey--text text--darken-2',
+        },
+        {
+          label: 'Expected Revenue',
+          value: this.formatNumber(this.expectedRevenue),
+          breakdown: vol && targetPrice
+            ? `${vol} kg × KES ${targetPrice.toFixed(2)}/kg`
+            : '',
+          class: 'grey--text text--darken-2',
+        },
+        {
+          label: 'Actual Revenue',
+          value: this.formatNumber(this.actualRevenue),
+          breakdown: vol && actualRate
+            ? `${vol} kg × KES ${actualRate.toFixed(2)}/kg${
+                targetPrice && Math.abs(actualRate - targetPrice) >= 0.5
+                  ? ` (${actualRate > targetPrice ? '+' : '−'}KES ${Math.abs(actualRate - targetPrice).toFixed(2)} vs target)`
+                  : ''
+              }`
+            : '',
+          class: 'grey--text text--darken-2',
+        },
+        {
+          label: 'Actual Price / kg',
+          value: `KES ${this.actualPricePerKg}`,
+          breakdown: vol
+            ? `Revenue ÷ Volume (${this.formatNumber(this.actualRevenue)} ÷ ${vol} kg)`
+            : '',
+          class: 'blue--text text--darken-2',
+        },
+        {
+          label: 'Cost of Goods',
+          value: this.formatNumber(this.expectedCost),
+          breakdown: vol && costPerKg
+            ? `${vol} kg × KES ${costPerKg.toFixed(2)}/kg`
+            : '',
+          class: 'grey--text text--darken-2',
+        },
+        {
+          label: 'Expenses',
+          value: this.formatNumber(this.todayExpenseTotal),
+          breakdown: expenseCount
+            ? `${expenseCount} item${expenseCount !== 1 ? 's' : ''}`
+            : 'No expenses',
+          class: 'grey--text text--darken-2',
+        },
         {
           label: 'Net Profit',
           value: this.formatNumber(this.expectedProfit),
+          breakdown: 'Revenue − Expenses',
           class: this.expectedProfit >= 0 ? 'green--text font-weight-bold' : 'red--text font-weight-bold',
         },
       ]
@@ -2022,7 +2203,6 @@ export default {
   },
 
   methods: {
-    // ── Subscription Gate ───────────────────────────────────────
     async checkSubscription() {
       this.subLoading = true
       try {
@@ -2036,7 +2216,6 @@ export default {
         this.subData = data
         this.subActive = data?.is_active === true
 
-        // Prefer plan from subscription status when available
         const planName = (
           data?.subscription?.plan ||
           data?.subscription?.tier ||
@@ -2068,10 +2247,24 @@ export default {
       }
     },
 
+    async loadRole() {
+      if (!this.user?.uid) return
+      try {
+        const { data } = await apiClient.get(`/users/me/role?firebase_uid=${this.user.uid}`)
+        this.role = data.role || 'none'
+        this.isOwner = this.role === 'owner'
+        this.accessibleBranchIds = data.accessible_branch_ids || []
+      } catch (e) {
+        console.warn('Role fetch failed — defaulting to none', e)
+        this.role = 'none'
+        this.isOwner = false
+        this.accessibleBranchIds = []
+      }
+    },
+
     SelectionChange(branchName) {
       if (!branchName) return
 
-      // Reset all dashboard data before loading the new branch
       this.resetDashboardData()
 
       if (branchName === 'All Branches') {
@@ -2087,19 +2280,32 @@ export default {
 
       this.isConsolidated = false
       this.selectedBranch = branchName
-      this.branchId = branch.id
+      this.branchId = Number(branch.id)
       this.refreshAll()
     },
 
     handleCloseDayClick() {
       if (!this.subActive) {
-        this.$router.push('/subscription')
+        if (this.isOwner) {
+          this.$router.push('/subscription')
+        } else {
+          this.showSnackbar('Subscription inactive. Contact your business owner.', 'warning')
+        }
         return
       }
       if (this.isConsolidated) {
         this.showSnackbar('Select a specific branch to close the business day', 'warning')
         return
       }
+
+      if (this.dateAlreadyEntered) {
+        this.showSnackbar(
+          `Entry for ${this.formatDateShort(this.searchDate2)} has already been recorded. Editing is disabled.`,
+          'warning'
+        )
+        return
+      }
+
       this.openCloseDay()
     },
 
@@ -2159,7 +2365,6 @@ export default {
         const response = await apiClient.request({ method, url: endpoint, data })
         return response.data
       } catch (error) {
-        const msg = error.response?.data?.message || error.message
         throw error
       }
     },
@@ -2170,24 +2375,21 @@ export default {
       try {
         await this.loadUserProfile()
 
-        // Load branches only for Pro (multi-branch plan feature)
-        if (this.canUseMultiBranch) {
-          await this.loadBranches()
-        } else {
-          // Starter / Business: single branch only
+        // Always attempt to load branches — managers need their single branch
+        // loaded too, and owners on any paid plan need it for the selector.
+        await this.loadBranches()
+
+        if (!this.canSwitchBranches) {
           this.isConsolidated = false
-          this.branches = []
         }
 
         if (this.isConsolidated && this.branches.length > 0) {
-          // Consolidated multi-branch view — load entries first so today-stats can reuse them
           await this.loadConsolidatedRecentEntries()
           await Promise.all([
             this.loadConsolidatedStats(),
             this.loadConsolidatedTodayStats(),
           ])
         } else if (this.branchId) {
-          // Single branch view
           await Promise.all([
             this.loadStats(),
             this.loadRecentEntries(),
@@ -2202,12 +2404,15 @@ export default {
         this.loading = false
       }
     },
-get7DaysBefore(date) {
-  return moment(date).subtract(7, 'days').format('YYYY-MM-DD')
-},
-get30DaysBefore(date) {
-  return moment(date).subtract(30, 'days').format('YYYY-MM-DD')
-},
+
+    get7DaysBefore(date) {
+      return moment(date).subtract(7, 'days').format('YYYY-MM-DD')
+    },
+
+    get30DaysBefore(date) {
+      return moment(date).subtract(30, 'days').format('YYYY-MM-DD')
+    },
+
     async loadStats() {
       try {
         const [last, week, month] = await Promise.all([
@@ -2216,11 +2421,6 @@ get30DaysBefore(date) {
           this.apiCall('get', `/reports/month-to-date?branch_id=${this.branchId}`),
         ])
 
-        // Backend now returns:
-        //   totalCost = expenses only (from expenses table)
-        //   cogs / totalCogs = meat cost (sold_kg * cost_per_kg)
-        //   totalExpenses = same as totalCost
-
         const lastActualRevenue = parseFloat(last.actualRevenue) || parseFloat(last.totalRevenue) || 0
         const lastCogs = parseFloat(last.cogs) || parseFloat(last.totalCogs) || 0
         const lastTotalCost = parseFloat(last.totalCost) || parseFloat(last.totalExpenses) || 0
@@ -2228,17 +2428,15 @@ get30DaysBefore(date) {
         this.stats.last = {
           revenue: parseFloat(last.expectedRevenue) || parseFloat(last.totalRevenue) || 0,
           actualRevenue: lastActualRevenue,
-          cost: lastTotalCost,              // ✅ TOTAL COST = expenses only
-          cogs: lastCogs,                   // COGS = meat cost (separate)
-          expenses: lastTotalCost,          // Same as cost, for clarity
-          margin: lastActualRevenue - lastTotalCost,  // ✅ Option B: Revenue - Expenses only  // Profit = Revenue - COGS - Expenses
+          cost: lastTotalCost,
+          cogs: lastCogs,
+          expenses: lastTotalCost,
+          margin: lastActualRevenue - lastTotalCost,
           expectedMargin: parseFloat(last.expectedMargin) || 0,
           revenueVariance: parseFloat(last.revenueVariance) || 0,
           paymentCash: parseFloat(last.paymentCash) || 0,
           paymentMpesa: parseFloat(last.paymentMpesa) || 0,
         }
-
-        console.log('Stats loaded:', this.stats)
 
         const weekRevenue = parseFloat(week.totalActualRevenue) || parseFloat(week.totalRevenue) || 0
         const weekCogs = parseFloat(week.totalCogs) || 0
@@ -2247,10 +2445,10 @@ get30DaysBefore(date) {
         this.stats.week = {
           revenue: parseFloat(week.totalRevenue) || 0,
           actualRevenue: weekRevenue,
-          cost: weekCost,                   // ✅ TOTAL COST = expenses only
-          cogs: weekCogs,                   // COGS = meat cost
+          cost: weekCost,
+          cogs: weekCogs,
           expenses: weekCost,
-          margin: weekRevenue - weekCost,  // ✅ Option B: Revenue - Expenses only
+          margin: weekRevenue - weekCost,
         }
 
         const monthRevenue = parseFloat(month.totalActualRevenue) || parseFloat(month.totalRevenue) || 0
@@ -2260,10 +2458,10 @@ get30DaysBefore(date) {
         this.stats.month = {
           revenue: parseFloat(month.totalRevenue) || 0,
           actualRevenue: monthRevenue,
-          cost: monthCost,                  // ✅ TOTAL COST = expenses only
-          cogs: monthCogs,                  // COGS = meat cost
+          cost: monthCost,
+          cogs: monthCogs,
           expenses: monthCost,
-          margin: monthRevenue - monthCost,  // ✅ Option B: Revenue - Expenses only
+          margin: monthRevenue - monthCost,
         }
 
         this.weekTrend.revenue = (this.stats.last.actualRevenue || this.stats.last.revenue) - (this.stats.week.revenue / 7)
@@ -2274,9 +2472,9 @@ get30DaysBefore(date) {
 
     async loadRecentEntries() {
       try {
-        const entries = await this.apiCall('get', `/daily-operations?branch_id=${this.branchId}`)
+        const entries = await this.apiCall('get', `/daily-operations?branch_id=${this.branchId}&limit=180`)
         this.recentEntries = Object.freeze(entries || [])
-        console.log('Recent entries', this.recentEntries)
+
         const todayEntry = this.recentEntries.find((e) => e.date === this.searchDate2)
         if (todayEntry) {
           this.populateForm(todayEntry)
@@ -2290,7 +2488,6 @@ get30DaysBefore(date) {
     async loadLastEntry() {
       try {
         const entry = await this.apiCall('get', `/daily-operations/last?branch_id=${this.branchId}`)
-        console.log('Last entry', entry)
 
         if (entry) {
           this.lastClosingStock = entry.closing_stock_kg
@@ -2298,40 +2495,36 @@ get30DaysBefore(date) {
             this.form.opening_stock_kg = entry.closing_stock_kg
           }
 
-          // Fetch actual expenses for this date from the expenses table
           let totalExpenses = 0
           try {
             const expenseData = await this.apiCall('get', `/expenses/${entry.date}?branch_id=${this.branchId}`)
             totalExpenses = expenseData?.totalPaid || 0
             this.todayExpenses = expenseData?.expenses || []
-            this.total_expenses = totalExpenses  // ✅ Sync with kpiCards
+            this.total_expenses = totalExpenses
           } catch (expError) {
-            console.log('No expenses found for this date')
             this.todayExpenses = []
             this.total_expenses = 0
           }
 
-          // ===== REVENUE BREAKDOWN =====
-          const expectedRevenue = parseFloat(entry.revenue) || 0           // Stock math: sold_kg × selling_price
-          const paymentCash = parseFloat(entry.payment_cash) || 0          // Actual cash collected
-          const paymentMpesa = parseFloat(entry.payment_mpesa) || 0        // Actual M-Pesa collected
-          const actualRevenue = paymentCash + paymentMpesa                // Total payments received
-          const cogs = (parseFloat(entry.sold_kg) || 0) * (parseFloat(entry.cost_per_kg) || 0)
-
-          // ✅ Option B: Real profit = actual payments − expenses only (COGS NOT subtracted)
+          const expectedRevenue = parseFloat(entry.revenue) || 0
+          const paymentCash = parseFloat(entry.payment_cash) || 0
+          const paymentMpesa = parseFloat(entry.payment_mpesa) || 0
+          const actualRevenue = parseFloat(entry.actual_revenue) || (paymentCash + paymentMpesa)
+          const cogs = parseFloat(entry.cogs) || ((parseFloat(entry.sold_kg) || 0) * (parseFloat(entry.cost_per_kg) || 0))
           const actualProfit = actualRevenue - totalExpenses
-          // ✅ Option B: Expected profit = expected revenue − expenses only (COGS NOT subtracted)
           const expectedProfit = expectedRevenue - totalExpenses
           const revenueVariance = expectedRevenue - actualRevenue
 
           this.todayStats = {
-            revenue: expectedRevenue,        // Expected (for COG reference)
-            actualRevenue: actualRevenue,     // Actual payments received
+            revenue: expectedRevenue,
+            actualRevenue: actualRevenue,
             paymentCash: paymentCash,
             paymentMpesa: paymentMpesa,
             revenueVariance: revenueVariance,
-            profit: actualProfit,             // Real profit (actual − costs)
-            expectedProfit: expectedProfit,   // Theoretical profit
+            profit: actualProfit,
+            expectedProfit: expectedProfit,
+            cogs: cogs,
+            totalExpenses: totalExpenses,
             marginPct: actualRevenue ? ((actualProfit / actualRevenue) * 100).toFixed(1) : 0,
             wasteKg: parseFloat(entry.waste_kg) || 0,
             mpesa: paymentMpesa,
@@ -2343,7 +2536,6 @@ get30DaysBefore(date) {
       }
     },
 
-    // ── Consolidated Multi-Branch Loaders ─────────────────────────
     async loadConsolidatedStats() {
       try {
         const branchIds = this.branches.map(b => b.id)
@@ -2421,7 +2613,7 @@ get30DaysBefore(date) {
         await Promise.all(
           this.branches.map(async (branch) => {
             try {
-              const entries = await this.apiCall('get', `/daily-operations?branch_id=${branch.id}`)
+              const entries = await this.apiCall('get', `/daily-operations?branch_id=${branch.id}&limit=180`)
               ;(entries || []).forEach((e) => {
                 allEntries.push({
                   ...e,
@@ -2435,7 +2627,6 @@ get30DaysBefore(date) {
           })
         )
 
-        // Sort by date descending, then branch name
         allEntries.sort((a, b) => {
           const dateCmp = moment(b.date).valueOf() - moment(a.date).valueOf()
           if (dateCmp !== 0) return dateCmp
@@ -2473,8 +2664,8 @@ get30DaysBefore(date) {
               const expected = parseFloat(entry.revenue) || 0
               const cash = parseFloat(entry.payment_cash) || 0
               const mpesa = parseFloat(entry.payment_mpesa) || 0
-              const actual = cash + mpesa
-              const cogs = (parseFloat(entry.sold_kg) || 0) * (parseFloat(entry.cost_per_kg) || 0)
+              const actual = parseFloat(entry.actual_revenue) || (cash + mpesa)
+              const cogs = parseFloat(entry.cogs) || ((parseFloat(entry.sold_kg) || 0) * (parseFloat(entry.cost_per_kg) || 0))
               const waste = parseFloat(entry.waste_kg) || 0
 
               totalExpected += expected
@@ -2521,10 +2712,7 @@ get30DaysBefore(date) {
         if (!this.user?.uid) return
         const { data } = await apiClient.get(`/users/${this.user.uid}/profile`)
         this.userProfile = data
-        console.log(data)
 
-        // Normalize plan name from users.subscription / plans.name
-        // plans table: starter | pro | Business
         const raw = (data.subscription || data.plan || '').toString().trim().toLowerCase()
         if (raw === 'pro' || raw === 'professional') {
           this.planTier = 'pro'
@@ -2544,9 +2732,9 @@ get30DaysBefore(date) {
         if (data.mpesa_receipt) this.mpesaReceipt = data.mpesa_receipt
         if (data.subscription) this.subscription = data.subscription
 
-        // Only set default branchId from profile if user hasn't selected one yet
+        // Prefer user's primary branch as initial selection (only if nothing selected yet)
         if (data.branch_id && !this.branchId) {
-          this.branchId = data.branch_id
+          this.branchId = Number(data.branch_id)
         }
       } catch (e) {
         console.error('Profile load error:', e)
@@ -2558,26 +2746,33 @@ get30DaysBefore(date) {
         if (!this.user?.uid) return
         const { data } = await apiClient.get(`/branches/my?firebase_uid=${this.user.uid}`)
         this.branches = data || []
-        console.log('Branches loaded:', this.branches)
 
-        // Preserve consolidated mode if already active
         if (this.isConsolidated) {
           this.selectedBranch = 'All Branches'
           this.branchId = 0
           return
         }
 
-        // Auto-select first branch if selector is currently empty
         if (!this.selectedBranch && this.branches.length > 0) {
-          const first = this.branches[0]
-          this.selectedBranch = first.name
-          this.branchId = first.id
+          // Prefer the user's primary branch if it's in the list
+          const primary = this.branchId
+            ? this.branches.find(b => Number(b.id) === Number(this.branchId))
+            : null
+          const chosen = primary || this.branches[0]
+
+          this.selectedBranch = chosen.name
+          this.branchId = Number(chosen.id)
           this.isConsolidated = false
         } else if (this.branchId && this.branches.length) {
-          // Sync the dropdown label to the currently active branchId
-          const current = this.branches.find(b => b.id === this.branchId)
+          const current = this.branches.find(b => Number(b.id) === Number(this.branchId))
           if (current) {
             this.selectedBranch = current.name
+            this.isConsolidated = false
+          } else {
+            // Primary branch was deleted or inaccessible — fall back to first available
+            const first = this.branches[0]
+            this.selectedBranch = first.name
+            this.branchId = Number(first.id)
             this.isConsolidated = false
           }
         }
@@ -2592,10 +2787,10 @@ get30DaysBefore(date) {
       this.form.supply_kg = entry.supply_kg || ''
       this.form.waste_kg = entry.waste_kg || ''
       this.form.closing_stock_kg = entry.closing_stock_kg || ''
-      this.form.cost_per_kg = entry.cost_per_kg || 420
-      this.form.selling_price_per_kg = entry.selling_price_per_kg || 650
-      this.form.payment_cash = entry.payment_cash || 0
-      this.form.payment_mpesa = entry.payment_mpesa || 0
+      this.form.cost_per_kg = entry.cost_per_kg || ''
+      this.form.selling_price_per_kg = entry.selling_price_per_kg || ''
+      this.form.payment_cash = entry.payment_cash ?? ''
+      this.form.payment_mpesa = entry.payment_mpesa ?? ''
       this.isEditing = true
     },
 
@@ -2605,13 +2800,20 @@ get30DaysBefore(date) {
     },
 
     openCloseDay() {
+      if (this.dateAlreadyEntered) {
+        this.showSnackbar(
+          `Entry for ${this.formatDateShort(this.searchDate2)} has already been recorded.`,
+          'warning'
+        )
+        return
+      }
+
       this.showForm = true
       this.activeTab = 0
       this.confirmDialog = false
       if (!this.form.opening_stock_kg && this.lastClosingStock !== null && !this.isEditing) {
         this.form.opening_stock_kg = this.lastClosingStock
       }
-      // Load expenses for the date being opened
       this.loadExpensesForDate(this.searchDate2)
     },
 
@@ -2620,21 +2822,23 @@ get30DaysBefore(date) {
       this.todayExpenses = []
       if (!this.isEditing) this.resetForm()
     },
-getPreviousNDays(endDate, n = 30) {
-  const end = moment(endDate)
-  const dates = []
-  
-  for (let i = n - 1; i >= 0; i--) {
-    dates.push(moment(end).subtract(i, 'days').format('YYYY-MM-DD'))
-  }
-  
-  return {
-    dates,
-    count: n,
-    startDate: dates[0],
-    endDate: dates[n - 1]
-  }
-},
+
+    getPreviousNDays(endDate, n = 30) {
+      const end = moment(endDate)
+      const dates = []
+
+      for (let i = n - 1; i >= 0; i--) {
+        dates.push(moment(end).subtract(i, 'days').format('YYYY-MM-DD'))
+      }
+
+      return {
+        dates,
+        count: n,
+        startDate: dates[0],
+        endDate: dates[n - 1]
+      }
+    },
+
     onDialogDateChange() {
       this.dialogDateMenu = false
       this.form.date = this.searchDate2
@@ -2645,7 +2849,6 @@ getPreviousNDays(endDate, n = 30) {
         this.isEditing = false
         this.resetForm()
       }
-      // Load expenses for the selected date
       this.loadExpensesForDate(this.searchDate2)
     },
 
@@ -2659,7 +2862,6 @@ getPreviousNDays(endDate, n = 30) {
         this.isEditing = false
         this.resetForm()
       }
-      // Load expenses for the selected date
       this.loadExpensesForDate(this.searchDate2)
     },
 
@@ -2667,12 +2869,8 @@ getPreviousNDays(endDate, n = 30) {
       try {
         const expenseData = await this.apiCall('get', `/expenses/${date}?branch_id=${this.branchId}`)
         this.todayExpenses = expenseData?.expenses || []
-        
-this.total_expenses = this.todayExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
-
-        console.log(`Expenses for ${date}:`, this.todayExpenses , "total:", this.total_expenses)
+        this.total_expenses = this.todayExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
       } catch (e) {
-        console.log('No expenses found for', date)
         this.todayExpenses = []
       }
     },
@@ -2681,31 +2879,26 @@ this.total_expenses = this.todayExpenses.reduce((sum, exp) => sum + (parseFloat(
       try {
         const expenseData = await this.apiCall('get', `/expenses/${date}?branch_id=${this.branchId}`)
         this.sevenExpenses = expenseData?.expenses || []
-        
-this.total_expenses7 = this.sevenExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
-
-        console.log(`Expenses for 7 ${date}:`, this.sevenExpenses , "total:", this.total_expenses7)
+        this.total_expenses7 = this.sevenExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
       } catch (e) {
-        console.log('No expenses found for', date)
         this.sevenExpenses = []
       }
     },
+
     async loadExpensesForDate30(date) {
       try {
         const expenseData = await this.apiCall('get', `/expenses/${date}?branch_id=${this.branchId}`)
         this.thirtyExpenses = expenseData?.expenses || []
-        
-this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
-
-        console.log(`Expenses for 30 ${date}:`, this.thirtyExpenses , "total:", this.total_expenses30)
+        this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFloat(exp.amount) || 0), 0)
       } catch (e) {
-        console.log('No expenses found for', date)
         this.thirtyExpenses = []
       }
     },
 
     calculateSold() {},
+
     addExpenseInline() {
+      if (this.formReadOnly) return
       if (!this.expenseForm.title || !this.expenseForm.amount) return
       this.todayExpenses.push({
         title: this.expenseForm.title,
@@ -2713,27 +2906,36 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
       })
       this.expenseForm = { title: '', amount: '' }
     },
+
     removeExpense(index) {
+      if (this.formReadOnly) return
       this.todayExpenses.splice(index, 1)
     },
+
     saveDailyEntry() {
+      if (this.formReadOnly) {
+        this.showSnackbar('This entry has already been recorded and cannot be edited.', 'warning')
+        return
+      }
+      if (!this.formValid) {
+        this.showSnackbar(this.formValidationMessage || 'Please fill in all required fields', 'warning')
+        return
+      }
       if (this.volumeSold < 0) {
-        this.showSnackbar('Invalid stock figures', 'error')
+        this.showSnackbar('Invalid stock figures — closing stock exceeds available stock', 'error')
         return
       }
       this.confirmDialog = true
     },
+
     async submitConfirmed() {
       this.confirmDialog = false
       this.saving = true
-      console.log('💾 SUBMIT CONFIRMED called')
 
-      // ✅ FIX: Ensure branchId and date are never undefined
       const branchId = this.branchId || this.userProfile?.branch_id || 0
       const date = this.searchDate2 || moment().format('YYYY-MM-DD')
 
       if (!branchId) {
-        console.error('❌ No branchId available')
         this.showSnackbar('Error: No branch selected', 'error')
         this.saving = false
         return
@@ -2751,42 +2953,67 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
         payment_cash: parseFloat(this.form.payment_cash) || 0,
         payment_mpesa: parseFloat(this.form.payment_mpesa) || 0,
       }
-      console.log('📤 Payload:', payload)
 
       try {
-        const response = await this.apiCall('post', '/daily-operations', payload)
-        console.log('✅ Daily operation saved:', response)
+        await this.apiCall('post', '/daily-operations', payload)
 
         if (this.todayExpenses.length > 0) {
-          console.log('💰 Saving', this.todayExpenses.length, 'expenses')
-          await Promise.all(
-            this.todayExpenses.map((exp) =>
-              this.apiCall('post', '/expenses', {
-                branch_id: branchId,  // ✅ Use the safe branchId
+          for (const exp of this.todayExpenses) {
+            try {
+              await this.apiCall('post', '/expenses', {
+                branch_id: branchId,
                 title: exp.title,
                 amount: exp.amount,
-                date: date,  // ✅ Use the safe date
+                date: date,
               })
-            )
-          )
-          console.log('✅ Expenses saved')
+            } catch (expErr) {
+              const status = expErr.response?.status
+              if (status === 409) {
+                console.warn(`Expense skipped for ${date} — day already closed on backend`)
+                continue
+              }
+              throw expErr
+            }
+          }
         }
 
-        this.showSnackbar(this.isEditing ? 'Day updated!' : 'Day closed successfully!', 'success')
+        this.showSnackbar('Day closed successfully!', 'success')
         this.showForm = false
         this.todayExpenses = []
         this.isEditing = false
         this.resetForm()
         await this.refreshAll()
-        console.log('🔄 Refresh complete')
+
       } catch (e) {
-        console.error('❌ SUBMIT ERROR:', e.message, e.response?.data)
-        this.showSnackbar('Error saving: ' + (e.response?.data?.message || e.message), 'error')
+        const status = e.response?.status
+        const code = e.response?.data?.code
+        const message = e.response?.data?.message
+
+        if (status === 409 && code === 'ENTRY_LOCKED') {
+          this.showSnackbar(
+            message || 'This entry has already been recorded and cannot be edited.',
+            'warning'
+          )
+          this.showForm = false
+          this.todayExpenses = []
+          this.isEditing = false
+          this.resetForm()
+          await this.refreshAll()
+          return
+        }
+
+        if (status === 405) {
+          this.showSnackbar('Editing daily entries is not allowed.', 'warning')
+          return
+        }
+
+        console.error('SUBMIT ERROR:', e.message, e.response?.data)
+        this.showSnackbar('Error saving: ' + (message || e.message), 'error')
       } finally {
         this.saving = false
-        console.log('🏁 Saving finished')
       }
     },
+
     resetForm() {
       this.form = {
         date: moment().format('YYYY-MM-DD'),
@@ -2794,32 +3021,39 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
         supply_kg: '',
         waste_kg: '',
         closing_stock_kg: '',
-        cost_per_kg: 420,
-        selling_price_per_kg: 650,
-        payment_cash: 0,
-        payment_mpesa: 0,
+        cost_per_kg: '',
+        selling_price_per_kg: '',
+        payment_cash: '',
+        payment_mpesa: '',
       }
     },
+
     showSnackbar(text, color = 'success') {
       this.snackbar = { show: true, text, color }
     },
+
     editEntry(item) {
-      // If in consolidated view, switch to the entry's branch first
       if (this.isConsolidated && item.branch_id) {
         const branch = this.branches.find(b => b.id === item.branch_id)
         if (branch) {
           this.isConsolidated = false
           this.selectedBranch = branch.name
-          this.branchId = branch.id
+          this.branchId = Number(branch.id)
         }
       }
+
       this.searchDate2 = item.date
       this.populateForm(item)
-      this.openCloseDay()
+      this.showForm = true
+      this.activeTab = 0
+      this.confirmDialog = false
+      this.loadExpensesForDate(this.searchDate2)
     },
+
     onResize() {
       this.nav_bars = window.innerWidth < 768
     },
+
     logout() {
       this.$fire.auth.signOut()
       this.$router.push('/login')
@@ -2828,8 +3062,7 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 
   watch: {
     selectedBranch(newVal, oldVal) {
-      // If user clears the selector, reload branches and auto-select first one (Pro only)
-      if (!newVal && oldVal && this.canUseMultiBranch) {
+      if (!newVal && oldVal && this.canSwitchBranches) {
         this.loadBranches()
       }
     },
@@ -2851,10 +3084,12 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
     this.authUnsubscribe = this.$fire.auth.onAuthStateChanged((user) => {
       if (user) {
         this.user = user
-        // Check subscription FIRST, then load data regardless so they can preview
-        this.checkSubscription().then(() => {
-          this.refreshAll()
-          this.loadUserProfile()
+        // Check subscription + role, then load everything once
+        Promise.all([
+          this.checkSubscription(),
+          this.loadRole(),
+        ]).then(() => {
+          this.refreshAll()   // refreshAll internally calls loadUserProfile + loadBranches
         })
       } else {
         this.$router.push('/login')
@@ -2893,6 +3128,10 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 @keyframes pulse-soft {
   0%, 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4); }
   50% { box-shadow: 0 0 0 12px rgba(211, 47, 47, 0); }
+}
+@keyframes pulse-close {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
 }
 .reveal-card { animation: fadeInUp 0.6s ease-out both; }
 
@@ -2944,28 +3183,28 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 .kpi-avatar { transition: all 0.3s ease; }
 .kpi-card-modern:hover .kpi-avatar { transform: scale(1.05); }
 
-
 /* Action Card */
-.action-card-modern {
-  transition: all 0.3s ease;
-}
+.action-card-modern { transition: all 0.3s ease; }
 
 .action-pending {
   background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
   border: 1px solid #ffcdd2;
 }
-
-.action-pending .action-avatar {
-  animation: pulse-soft 2s infinite;
-}
-
-.action-complete {
-  background: #fafafa;
-  border: 1px solid #eeeeee;
-}
+.action-pending .action-avatar { animation: pulse-close 2s infinite; }
+.action-complete { background: #fafafa; border: 1px solid #eeeeee; }
 
 .action-btn-modern {
   letter-spacing: 0.02em;
+  transition: all 0.3s ease;
+}
+.action-btn-modern:active { transform: scale(0.98); }
+
+/* Close Button Styles */
+.close-nav-btn { position: relative; }
+.close-badge {
+  position: absolute;
+  top: 8px;
+  right: 20%;
 }
 
 /* Card Headers */
@@ -2974,40 +3213,18 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 }
 
 /* Tables */
-.performance-table-modern tbody tr {
-  transition: background-color 0.2s ease;
-}
-
-.performance-table-modern tbody tr:hover {
-  background-color: #fafafa;
-}
-
-.entries-table-modern tbody tr {
-  transition: background-color 0.2s ease;
-}
-
-.entries-table-modern tbody tr:hover {
-  background-color: #fafafa;
-}
-
-.row-modern {
-  transition: background-color 0.2s ease;
-}
+.performance-table-modern tbody tr { transition: background-color 0.2s ease; }
+.performance-table-modern tbody tr:hover { background-color: #fafafa; }
+.entries-table-modern tbody tr { transition: background-color 0.2s ease; }
+.entries-table-modern tbody tr:hover { background-color: #fafafa; }
+.row-modern { transition: background-color 0.2s ease; }
 
 /* Progress Bars */
-.progress-modern {
-  border-radius: 10px !important;
-}
-
-.progress-modern ::v-deep .v-progress-linear__determinate {
-  border-radius: 10px !important;
-}
+.progress-modern { border-radius: 10px !important; }
+.progress-modern ::v-deep .v-progress-linear__determinate { border-radius: 10px !important; }
 
 /* Search */
-.search-field-modern ::v-deep .v-input__slot {
-  transition: all 0.25s ease;
-}
-
+.search-field-modern ::v-deep .v-input__slot { transition: all 0.25s ease; }
 .search-field-modern ::v-deep .v-input__slot:hover,
 .search-field-modern.v-input--is-focused ::v-deep .v-input__slot {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -3015,168 +3232,78 @@ this.total_expenses30 = this.thirtyExpenses.reduce((sum, exp) => sum + (parseFlo
 
 /* Dialog */
 .dialog-toolbar-modern {
-  background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%) !important;
+  transition: background 0.3s ease;
 }
-
-.dialog-content-modern {
-  background-color: #f5f5f5 !important;
-}
-
-.tabs-modern ::v-deep .v-tab {
-  letter-spacing: 0.02em;
-}
-
-.tabs-modern ::v-deep .v-tab--active {
-  font-weight: 700 !important;
-}
+.dialog-content-modern { background-color: #f5f5f5 !important; }
+.tabs-modern ::v-deep .v-tab { letter-spacing: 0.02em; }
+.tabs-modern ::v-deep .v-tab--active { font-weight: 700 !important; }
 
 /* Confirm Dialog */
-.confirm-table-modern tbody tr.confirm-row {
-  border-bottom: 1px solid #f5f5f5;
-}
-
-.confirm-table-modern tbody tr.confirm-row:hover {
-  background-color: #fafafa;
-}
-
-.confirm-table-modern tbody tr:last-child {
-  border-bottom: none;
-}
+.confirm-table-modern tbody tr.confirm-row { border-bottom: 1px solid #f5f5f5; }
+.confirm-table-modern tbody tr.confirm-row:hover { background-color: #fafafa; }
+.confirm-table-modern tbody tr:last-child { border-bottom: none; }
 
 /* Bottom Nav */
 .bottom-nav-modern {
   border-radius: 20px 20px 0 0 !important;
   overflow: hidden;
 }
+.bottom-nav-modern .v-btn { transition: all 0.3s ease; }
+.bottom-nav-modern .v-btn:hover { background: rgba(211, 47, 47, 0.1); }
+.bottom-nav-modern .v-btn--active { background: rgba(211, 47, 47, 0.15); }
+.bottom-nav-modern .v-btn--active::before { opacity: 0; }
 
 /* Mobile Drawer */
-.mobile-drawer-modern {
-  background: white !important;
-}
+.mobile-drawer-modern { background: white !important; }
 
 /* Hover Utilities */
-.hover-red:hover {
-  color: #d32f2f !important;
-}
-
-.hover-red:hover .v-icon {
-  color: #d32f2f !important;
-}
+.hover-red:hover { color: #d32f2f !important; }
+.hover-red:hover .v-icon { color: #d32f2f !important; }
 
 /* Snackbar */
-.snackbar-modern ::v-deep .v-snackbar__content {
-  padding: 12px 20px;
-}
+.snackbar-modern ::v-deep .v-snackbar__content { padding: 12px 20px; }
 
 /* Branch Selector */
-.branch-select-modern ::v-deep .v-input__slot {
-  min-height: 36px !important;
-}
+.branch-select-modern ::v-deep .v-input__slot { min-height: 36px !important; }
 .branch-select-modern ::v-deep .v-select__selections {
   padding-top: 2px !important;
   padding-bottom: 2px !important;
 }
 
-/* Responsive */
-/* Waterfall Chart */
-.waterfall-container {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* Disabled / read-only mode styling */
+.dialog-modern ::v-deep .v-input--is-disabled .v-input__slot {
+  background-color: #f5f5f5 !important;
+  opacity: 0.9;
 }
-.waterfall-row {
-  display: flex;
-  align-items: center;
-  padding: 8px 0;
+.dialog-modern ::v-deep .v-input--is-disabled input,
+.dialog-modern ::v-deep .v-input--is-disabled textarea {
+  pointer-events: none !important;
+  user-select: none !important;
+  cursor: not-allowed !important;
+  color: #424242 !important;
+  -webkit-text-fill-color: #424242 !important;
 }
-.waterfall-row.waterfall-subtotal {
-  border-top: 1px dashed #e0e0e0;
-  border-bottom: 1px dashed #e0e0e0;
-  margin: 4px 0;
-  padding: 10px 0;
+.dialog-modern ::v-deep .v-input--is-disabled .v-label {
+  color: #757575 !important;
 }
-.waterfall-row.waterfall-total {
-  border-top: 2px solid #e0e0e0;
-  margin-top: 4px;
-  padding-top: 12px;
+.dialog-modern ::v-deep .v-input--is-disabled .v-input__icon {
+  color: #bdbdbd !important;
 }
-.waterfall-label {
-  width: 160px;
-  font-size: 13px;
-  color: #616161;
-  display: flex;
-  align-items: center;
-}
-.waterfall-bar-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.waterfall-bar {
-  height: 32px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 10px;
-  min-width: 60px;
-  transition: width 0.6s ease;
-}
-.waterfall-value {
-  color: white;
-  font-weight: 600;
-  font-size: 13px;
-  white-space: nowrap;
-}
-.waterfall-pct {
-  font-size: 12px;
-  color: #9e9e9e;
-  min-width: 40px;
-}
-.green-bar { background: linear-gradient(90deg, #43a047, #66bb6a); }
-.grey-bar { background: linear-gradient(90deg, #757575, #9e9e9e); }
-.blue-bar { background: linear-gradient(90deg, #1976d2, #42a5f5); }
-.orange-bar { background: linear-gradient(90deg, #f57c00, #ffa726); }
-.green-dark-bar { background: linear-gradient(90deg, #2e7d32, #43a047); }
-.red-bar { background: linear-gradient(90deg, #c62828, #ef5350); }
 
 @media (max-width: 599px) {
-  .sticky-header {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  .reveal-card {
-    animation-duration: 0.4s;
-  }
-
-  .kpi-card-modern {
-    padding: 16px !important;
-  }
-
+  .sticky-header { padding-left: 12px; padding-right: 12px; }
+  .reveal-card { animation-duration: 0.4s; }
+  .kpi-card-modern { padding: 16px !important; }
   .action-btn-modern {
     padding-top: 20px !important;
     padding-bottom: 20px !important;
   }
-
   .action-avatar {
     width: 44px !important;
     height: 44px !important;
     min-width: 44px !important;
     margin-right: 12px !important;
   }
-
-  .dialog-content-modern {
-    padding: 16px !important;
-  }
-
-  .waterfall-label {
-    width: 120px;
-    font-size: 11px;
-  }
-  .waterfall-value {
-    font-size: 11px;
-  }
+  .dialog-content-modern { padding: 16px !important; }
 }
 </style>

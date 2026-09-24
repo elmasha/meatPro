@@ -3,7 +3,7 @@
     <!-- Desktop Sidebar -->
     <v-navigation-drawer v-if="!nav_bars" permanent width="260" class="elevation-1" color="white">
       <div class="pa-6">
-        <div class="d-flex align-center mb-1 cursor-pointer" @click="$router.push('/')">
+        <div class="d-flex align-center mb-1 cursor-pointer" @click="$router.push('/dashboard')">
           <v-avatar color="red darken-2" size="36" class="mr-3">
             <v-icon color="white" size="20">mdi-food-steak</v-icon>
           </v-avatar>
@@ -38,8 +38,19 @@
         <!-- Header -->
         <v-row align="center" class="mb-6">
           <v-col cols="12" sm="8">
-            <h1 class="text-h5 text-sm-h4 font-weight-bold grey--text text--darken-3">Subscription & Billing</h1>
-            <p class="text-caption grey--text mt-1">Manage your plan and M-Pesa payments</p>
+            <div class="d-flex align-center">
+              <v-btn icon small class="mr-3" to="/dashboard">
+                <v-icon>mdi-arrow-left</v-icon>
+              </v-btn>
+              <div>
+                <h1 class="text-h5 text-sm-h4 font-weight-bold grey--text text--darken-3">
+                  Subscription & Billing
+                </h1>
+                <p class="text-caption grey--text mt-1 mb-0">
+                  Manage your plan and M-Pesa payments
+                </p>
+              </div>
+            </div>
           </v-col>
         </v-row>
 
@@ -55,7 +66,7 @@
                   <div class="text-h6 font-weight-bold white--text">{{ currentSub?.subscription?.display_name || 'Starter' }}</div>
                   <div class="text-caption white--text" style="opacity: 0.9;">
                     <span v-if="currentSub.is_active">
-                      Active until {{ formatDate(currentSub?.subscription?.end_date) }} 
+                      Active until {{ formatDate(currentSub?.subscription?.end_date) }}
                       <v-chip x-small color="white" class="ml-2" :text-color="(currentSub?.days_remaining || 0) < 7 ? 'red' : 'green'">
                         {{ currentSub?.days_remaining || 0 }} days left
                       </v-chip>
@@ -83,13 +94,13 @@
         <!-- Plans -->
         <v-row id="plans-section" align="stretch" class="mb-8">
           <v-col v-for="plan in plans" :key="plan.id" cols="12" md="6">
-            <v-card class="plan-card rounded-2xl h-100 pa-6 d-flex flex-column" 
-              :class="{ 'plan-pro': plan.name === 'pro', 'plan-starter': plan.name === 'starter', 'elevation-8': isCurrentPlan(plan.name) }" 
+            <v-card class="plan-card rounded-2xl h-100 pa-6 d-flex flex-column"
+              :class="{ 'plan-pro': plan.name === 'pro', 'plan-starter': plan.name === 'starter', 'elevation-8': isCurrentPlan(plan.name) }"
               elevation="2">
 
               <div class="d-flex align-center justify-space-between mb-4">
-                <v-chip :color="plan.name === 'pro' ? 'red darken-2' : 'grey lighten-2'" 
-                  :text-color="plan.name === 'pro' ? 'white' : 'grey darken-2'" 
+                <v-chip :color="plan.name === 'pro' ? 'red darken-2' : 'grey lighten-2'"
+                  :text-color="plan.name === 'pro' ? 'white' : 'grey darken-2'"
                   small label class="font-weight-bold px-3">
                   {{ plan.display_name }}
                 </v-chip>
@@ -475,12 +486,12 @@ export default {
     formatNumber(val) { return numeral(val || 0).format('0,0'); },
     formatDate(date) { return date ? moment(date).format('MMM D, YYYY') : 'N/A'; },
     parseFeatures(featuresJson) {
-      try { return JSON.parse(featuresJson || '[]'); } 
+      try { return JSON.parse(featuresJson || '[]'); }
       catch { return []; }
     },
     // FIXED: Check by plan name (varchar) not plan_id
     isCurrentPlan(planName) {
-      return this.currentSub?.subscription?.plan === planName || 
+      return this.currentSub?.subscription?.plan === planName ||
              this.currentSub?.subscription?.plan_name === planName;
     },
     statusColor(status) {
@@ -511,7 +522,7 @@ export default {
       try {
         const { data } = await apiClient.get(`/subscriptions/history?firebase_uid=${this.firebaseUid}`);
         this.payments = data || [];
-      } catch (e) { 
+      } catch (e) {
         console.error('Payments error', e);
         this.payments = [];
       }
