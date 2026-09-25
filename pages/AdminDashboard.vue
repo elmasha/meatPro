@@ -31,7 +31,7 @@
           @click="activeSection = item.section"
           link
           class="mb-1 rounded-xl nav-item-premium"
-          :class="{ 
+          :class="{
             'red lighten-5 red--text': activeSection === item.section && !$vuetify.theme.dark,
             'red darken-4 white--text': activeSection === item.section && $vuetify.theme.dark
           }"
@@ -48,6 +48,11 @@
           <v-list-item-action v-if="item.section === 'payments' && stats.pendingApprovals > 0">
             <v-chip x-small color="error" text-color="white" class="font-weight-bold" style="font-size: 10px;">
               {{ stats.pendingApprovals }}
+            </v-chip>
+          </v-list-item-action>
+          <v-list-item-action v-if="item.section === 'approvals' && pendingRequests.length > 0">
+            <v-chip x-small color="warning" text-color="white" class="font-weight-bold" style="font-size: 10px;">
+              {{ pendingRequests.length }}
             </v-chip>
           </v-list-item-action>
         </v-list-item>
@@ -105,6 +110,14 @@
         <v-badge
           v-if="item.section === 'payments' && stats.pendingApprovals > 0"
           color="error"
+          dot
+          overlap
+          offset-x="8"
+          offset-y="4"
+        ></v-badge>
+        <v-badge
+          v-if="item.section === 'approvals' && pendingRequests.length > 0"
+          color="warning"
           dot
           overlap
           offset-x="8"
@@ -218,6 +231,22 @@
 
       <!-- ==================== DASHBOARD SECTION ==================== -->
       <v-container v-if="activeSection === 'dashboard'" :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
+        <!-- Maker-checker banner -->
+        <v-alert
+          v-if="pendingApprovalCode"
+          type="warning"
+          prominent
+          text
+          dismissible
+          class="mb-4 rounded-2xl"
+          @input="pendingApprovalCode = null"
+        >
+          <div class="font-weight-bold">Change submitted for approval</div>
+          <div class="text-caption">
+            Code <strong>{{ pendingApprovalCode }}</strong>. Super admins have been notified by SMS.
+          </div>
+        </v-alert>
+
         <!-- KPI Cards -->
         <v-row dense class="mb-4 mb-sm-6">
           <v-col
@@ -466,6 +495,112 @@
         </v-row>
       </v-container>
 
+      <!-- ==================== APPROVALS SECTION ==================== -->
+      <v-container v-if="activeSection === 'approvals'" :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
+        <v-row>
+          <v-col cols="12">
+            <v-card class="rounded-2xl" elevation="0" outlined>
+              <v-card-title class="d-flex align-center px-4 px-sm-6 py-4 card-header-premium">
+                <v-avatar color="warning lighten-5" size="36" class="mr-3">
+                  <v-icon color="warning darken-2">mdi-shield-key</v-icon>
+                </v-avatar>
+                <div>
+                  <div class="text-h6 font-weight-bold text--primary">Pending Approvals</div>
+                  <div class="text-caption text--secondary">
+                    Changes awaiting super-admin review ({{ pendingRequests.length }})
+                  </div>
+                </div>
+                <v-spacer></v-spacer>
+                <v-btn
+                  text
+                  small
+                  color="red darken-2"
+                  class="text-capitalize font-weight-medium red--text"
+                  :loading="pendingRequestsLoading"
+                  @click="fetchPendingRequests"
+                >
+                  <v-icon left small>mdi-refresh</v-icon> Refresh
+                </v-btn>
+              </v-card-title>
+              <v-divider></v-divider>
+
+              <div v-if="pendingRequests.length === 0" class="pa-12 text-center">
+                <v-icon size="56" color="grey lighten-2">mdi-check-all</v-icon>
+                <div class="text-h6 grey--text text--darken-1 mt-3">All clear</div>
+                <div class="text-body-2 grey--text">No pending change requests.</div>
+              </div>
+
+              <v-data-table
+                v-else
+                :headers="approvalHeaders"
+                :items="pendingRequests"
+                item-key="id"
+                :loading="pendingRequestsLoading"
+                class="entries-table-premium"
+                hide-default-footer
+                :items-per-page="-1"
+              >
+                <template v-slot:item.request_code="{ item }">
+                  <v-chip small label color="warning lighten-5" class="font-weight-bold">
+                    <span class="warning--text text--darken-2">{{ item.request_code }}</span>
+                  </v-chip>
+                </template>
+
+                <template v-slot:item.action="{ item }">
+                  <div class="d-flex align-center">
+                    <v-icon small color="red darken-2" class="mr-2">{{ actionIcon(item.action) }}</v-icon>
+                    <span class="font-weight-medium text--primary">{{ actionLabel(item.action) }}</span>
+                  </div>
+                </template>
+
+                <template v-slot:item.target="{ item }">
+                  <span class="text-caption text--secondary">
+                    {{ item.target_type }}<span class="font-weight-bold">#{{ item.target_id || 'new' }}</span>
+                  </span>
+                </template>
+
+                <template v-slot:item.maker_name="{ item }">
+                  <div class="d-flex align-center">
+                    <v-avatar size="28" color="red lighten-5" class="mr-2">
+                      <span class="red--text font-weight-bold text-caption">{{ getInitials(item.maker_name || '?') }}</span>
+                    </v-avatar>
+                    <span class="font-weight-medium">{{ item.maker_name || item.maker_uid }}</span>
+                  </div>
+                </template>
+
+                <template v-slot:item.expires_at="{ item }">
+                  <v-chip x-small label :color="expiryColor(item.expires_at)" text-color="white" class="font-weight-bold">
+                    {{ timeLeft(item.expires_at) }}
+                  </v-chip>
+                </template>
+
+                <template v-slot:item.actions="{ item }">
+                  <v-btn
+                    text
+                    x-small
+                    color="error"
+                    class="text-capitalize font-weight-medium mr-1"
+                    @click="decideChange(item.request_code, 'reject')"
+                  >
+                    <v-icon x-small left>mdi-close</v-icon> Reject
+                  </v-btn>
+                  <v-btn
+                    x-small
+                    color="success"
+                    dark
+                    class="rounded-lg font-weight-medium"
+                    elevation="0"
+                    @click="decideChange(item.request_code, 'approve')"
+                  >
+                    <v-icon x-small left>mdi-check</v-icon> Approve
+                  </v-btn>
+                </template>
+              </v-data-table>
+            </v-card>
+          </v-col>
+        </v-row>
+      </v-container>
+
       <!-- ==================== PLANS SECTION ==================== -->
       <v-container v-if="activeSection === 'plans'" :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
         <v-row>
@@ -485,6 +620,7 @@
               <v-data-table
                 :headers="planHeaders"
                 :items="plans"
+                item-key="id"
                 :loading="loading"
                 class="entries-table-premium"
                 hide-default-footer
@@ -556,6 +692,7 @@
               <v-data-table
                 :headers="userHeaders"
                 :items="filteredUsers"
+                item-key="id"
                 :loading="loading"
                 class="entries-table-premium"
                 hide-default-footer
@@ -659,6 +796,7 @@
               <v-data-table
                 :headers="subHeaders"
                 :items="subscriptions"
+                item-key="id"
                 :loading="loading"
                 class="entries-table-premium"
                 hide-default-footer
@@ -737,6 +875,7 @@
               <v-data-table
                 :headers="paymentHeaders"
                 :items="payments"
+                item-key="id"
                 :loading="loading"
                 class="entries-table-premium"
                 hide-default-footer
@@ -788,7 +927,6 @@
 
       <!-- ==================== FINANCE SECTION ==================== -->
       <v-container v-if="activeSection === 'finance'" :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
-        <!-- Summary Cards -->
         <v-row dense class="mb-4">
           <v-col v-for="card in financeCards" :key="card.title" cols="12" sm="6" md="3">
             <v-card :color="card.color" dark class="pa-5 rounded-2xl finance-card" elevation="0">
@@ -802,7 +940,6 @@
           </v-col>
         </v-row>
 
-        <!-- Filters -->
         <v-row class="mb-4">
           <v-col cols="12">
             <v-card class="rounded-2xl pa-4 pa-sm-5" elevation="0" outlined>
@@ -839,7 +976,6 @@
           </v-col>
         </v-row>
 
-        <!-- Revenue Table -->
         <v-row>
           <v-col cols="12">
             <v-card class="rounded-2xl" elevation="0" outlined>
@@ -858,6 +994,7 @@
               <v-data-table
                 :headers="revenueHeaders"
                 :items="revenueData"
+                item-key="period"
                 :loading="loading"
                 class="entries-table-premium"
                 hide-default-footer
@@ -1031,7 +1168,6 @@
     </v-dialog>
   </div>
 </template>
-
 <script>
 import api from '../services/api'
 
@@ -1055,6 +1191,10 @@ export default {
       recentUsers: [],
       pendingPayments: [],
       plans: [],
+      // ── Maker-checker state ──
+      pendingRequests: [],
+      pendingRequestsLoading: false,
+      pendingApprovalCode: null,
       users: [],
       subscriptions: [],
       payments: [],
@@ -1086,6 +1226,7 @@ export default {
       extendDays: 7,
       snackbar: { show: false, text: '', color: 'red darken-1' },
       authUnsubscribe: null,
+      _approvalPoll: null,
       chartData: [12000, 15000, 13500, 18000, 22000, 24000]
     }
   },
@@ -1100,7 +1241,8 @@ export default {
         users: 'User Management',
         subscriptions: 'Active Subscriptions',
         payments: 'Payment History',
-        finance: 'Revenue & Finance'
+        finance: 'Revenue & Finance',
+        approvals: 'Pending Approvals'
       }
       return titles[this.activeSection] || 'Admin'
     },
@@ -1111,7 +1253,18 @@ export default {
         { title: 'Users', icon: 'mdi-account-group', section: 'users' },
         { title: 'Subscriptions', icon: 'mdi-calendar-check', section: 'subscriptions' },
         { title: 'Payments', icon: 'mdi-cash-multiple', section: 'payments' },
-        { title: 'Finance', icon: 'mdi-chart-line', section: 'finance' }
+        { title: 'Finance', icon: 'mdi-chart-line', section: 'finance' },
+        { title: 'Approvals', icon: 'mdi-shield-key', section: 'approvals' }
+      ]
+    },
+    approvalHeaders() {
+      return [
+        { text: 'Code', value: 'request_code', sortable: false },
+        { text: 'Action', value: 'action', sortable: false },
+        { text: 'Target', value: 'target', sortable: false },
+        { text: 'Requested by', value: 'maker_name', sortable: false },
+        { text: 'Expires', value: 'expires_at', sortable: false, align: 'center' },
+        { text: 'Actions', value: 'actions', sortable: false, align: 'end' }
       ]
     },
     kpiCards() {
@@ -1243,6 +1396,7 @@ export default {
   watch: {
     activeSection(newVal) {
       this.loadSectionData(newVal)
+      if (newVal === 'approvals') this.fetchPendingRequests()
     }
   },
   mounted() {
@@ -1252,20 +1406,27 @@ export default {
       if (user) {
         this.userName = user.displayName || 'Admin'
         this.refreshAll()
+        this.fetchPendingRequests()
       } else {
         this.$router.push('/login')
       }
     })
+    this._approvalPoll = setInterval(() => {
+      if (this.$fire && this.$fire.auth && this.$fire.auth.currentUser) {
+        this.fetchPendingRequests()
+      }
+    }, 30000)
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.onResize)
-    if (this.authUnsubscribe) {
-      this.authUnsubscribe()
-    }
+    if (this.authUnsubscribe) this.authUnsubscribe()
+    if (this._approvalPoll) clearInterval(this._approvalPoll)
   },
   methods: {
     getUid() {
-      return this.$fire?.auth?.currentUser?.uid || ''
+      return this.$fire && this.$fire.auth && this.$fire.auth.currentUser
+        ? this.$fire.auth.currentUser.uid
+        : ''
     },
     getInitials(name) {
       if (!name) return '?'
@@ -1286,23 +1447,25 @@ export default {
     },
     async loadSectionData(section) {
       this.loading = true
-      switch(section) {
+      switch (section) {
         case 'dashboard': await Promise.all([this.fetchStats(), this.fetchUsers(), this.fetchPayments()]); break
         case 'plans': await this.fetchPlans(); break
         case 'users': await this.fetchUsers(); break
         case 'subscriptions': await this.fetchSubscriptions(); break
         case 'payments': await this.fetchPayments(); break
         case 'finance': await this.fetchRevenue(); break
+        case 'approvals': await this.fetchPendingRequests(); break
       }
       this.loading = false
     },
 
+    /* ─── DATA FETCHERS ─── */
     async fetchStats() {
       try {
         const uid = this.getUid()
         const { data } = await api.get('/admin/stats?uid=' + uid)
         this.stats = data.data || data
-      } catch (err) { 
+      } catch (err) {
         console.error(err)
       }
     },
@@ -1345,6 +1508,72 @@ export default {
       } catch (err) { console.error(err) }
     },
 
+    /* ─── MAKER-CHECKER HELPERS ─── */
+    isQueued(res) {
+      return res && res.status === 202 && res.data && res.data.status === 'pending_approval'
+    },
+    showQueuedSnackbar(code) {
+      this.pendingApprovalCode = code
+      this.snackbar = {
+        show: true,
+        text: 'Submitted for approval. Code: ' + code + '. Super admins notified by SMS.',
+        color: 'warning darken-2'
+      }
+      setTimeout(() => { this.snackbar.show = false }, 8000)
+    },
+    async fetchPendingRequests() {
+      this.pendingRequestsLoading = true
+      try {
+        const { data } = await api.get('/admin/change-requests')
+        this.pendingRequests = data.data || []
+      } catch (err) {
+        if (err.response && err.response.status === 403) {
+          this.pendingRequests = []
+        } else {
+          console.error('fetchPendingRequests', err)
+        }
+      } finally {
+        this.pendingRequestsLoading = false
+      }
+    },
+    async decideChange(code, decision) {
+      try {
+        await api.post('/admin/change-requests/' + code + '/decide', { decision: decision })
+        this.showSnackbar(
+          decision === 'approve' ? 'Change approved and applied' : 'Change rejected',
+          decision === 'approve' ? 'success' : 'info'
+        )
+        this.fetchPendingRequests()
+      } catch (err) {
+        this.showSnackbar((err.response && err.response.data && err.response.data.error) || 'Action failed', 'error')
+      }
+    },
+    actionLabel(action) {
+      return String(action).replace('.', ' › ')
+    },
+    actionIcon(action) {
+      if (action.startsWith('plan.')) return 'mdi-currency-usd'
+      if (action.startsWith('user.')) return 'mdi-account'
+      if (action.startsWith('subscription.')) return 'mdi-credit-card'
+      if (action.startsWith('payment.')) return 'mdi-cash'
+      return 'mdi-shield-key'
+    },
+    expiryColor(ts) {
+      const s = Math.floor((new Date(ts).getTime() - Date.now()) / 1000)
+      if (s <= 60) return 'error'
+      if (s <= 300) return 'warning darken-2'
+      return 'success'
+    },
+    timeLeft(ts) {
+      const s = Math.floor((new Date(ts).getTime() - Date.now()) / 1000)
+      if (s <= 0) return 'expired'
+      if (s < 60) return s + 's'
+      const m = Math.floor(s / 60)
+      if (m < 60) return m + 'm ' + (s % 60) + 's'
+      return Math.floor(m / 60) + 'h'
+    },
+
+    /* ─── PLANS ─── */
     parseFeatures(features) {
       if (!features) return []
       if (typeof features === 'string') {
@@ -1372,47 +1601,69 @@ export default {
     },
     async savePlan() {
       try {
+        let res
         if (this.editPlanMode) {
-          await api.put('/admin/plans/' + this.selectedPlan.id, {
+          res = await api.put('/admin/plans/' + this.selectedPlan.id, {
             display_name: this.planForm.display_name,
             price_kes: this.planForm.price_kes,
             billing_cycle: this.planForm.billing_cycle,
             description: this.planForm.description,
             features: this.planForm.features
           })
-          this.showSnackbar('Plan updated')
         } else {
-          await api.post('/admin/plans', this.planForm)
-          this.showSnackbar('Plan created')
+          res = await api.post('/admin/plans', this.planForm)
         }
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          this.planDialog = false
+          this.fetchPlans()
+          return
+        }
+        this.showSnackbar(this.editPlanMode ? 'Plan updated' : 'Plan created')
         this.planDialog = false
         this.fetchPlans()
       } catch (err) {
-        this.showSnackbar(err.response?.data?.error || 'Save failed', 'error')
+        this.showSnackbar((err.response && err.response.data && err.response.data.error) || 'Save failed', 'error')
       }
     },
     async togglePlanStatus(item) {
       var action = item.is_active ? 'deactivate' : 'activate'
-      if (!confirm(action + ' "' + item.display_name + '"?')) return
+      if (!confirm(action + ' "' + item.display_name + '"?')) {
+        item.is_active = !item.is_active
+        return
+      }
       try {
-        await api.patch('/admin/plans/' + item.id + '/status', { active: !item.is_active })
+        const res = await api.patch('/admin/plans/' + item.id + '/status', { active: !item.is_active })
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          item.is_active = !item.is_active
+          this.fetchPlans()
+          return
+        }
         this.showSnackbar('Plan ' + action + 'd')
         this.fetchPlans()
       } catch (err) {
+        item.is_active = !item.is_active
         this.showSnackbar('Failed', 'error')
       }
     },
     async deletePlan(item) {
       if (!confirm('Delete "' + item.display_name + '" permanently?')) return
       try {
-        await api.delete('/admin/plans/' + item.id)
+        const res = await api.delete('/admin/plans/' + item.id)
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          this.fetchPlans()
+          return
+        }
         this.showSnackbar('Plan deleted')
         this.fetchPlans()
       } catch (err) {
-        this.showSnackbar(err.response?.data?.error || 'Delete failed', 'error')
+        this.showSnackbar((err.response && err.response.data && err.response.data.error) || 'Delete failed', 'error')
       }
     },
 
+    /* ─── USERS ─── */
     openUserDialog(item, mode) {
       this.userDialogMode = mode || 'edit'
       this.selectedUser = item
@@ -1428,71 +1679,80 @@ export default {
     },
     async saveUser() {
       try {
-        await api.put('/admin/users/' + this.selectedUser.id, {
+        const res1 = await api.put('/admin/users/' + this.selectedUser.id, {
           name: this.userForm.name,
           phone: this.userForm.phone,
           user_type: this.userForm.user_type,
           subscription_status: this.userForm.subscription_status,
           subscription_expires: this.userForm.subscription_expires
         })
+        if (this.isQueued(res1)) {
+          this.showQueuedSnackbar(res1.data.request_code)
+          this.userDialog = false
+          this.fetchUsers()
+          return
+        }
         if (this.userForm.plan_id && this.userForm.subscription_status === 'active') {
-          await api.put('/admin/users/' + this.selectedUser.id + '/subscription', {
+          const res2 = await api.put('/admin/users/' + this.selectedUser.id + '/subscription', {
             plan_id: this.userForm.plan_id,
             subscription_status: 'active',
             months: 1
           })
+          if (this.isQueued(res2)) {
+            this.showQueuedSnackbar(res2.data.request_code)
+            this.userDialog = false
+            this.fetchUsers()
+            return
+          }
         }
         this.showSnackbar('User updated')
         this.userDialog = false
         this.fetchUsers()
       } catch (err) {
-        this.showSnackbar(err.response?.data?.error || 'Update failed', 'error')
+        this.showSnackbar((err.response && err.response.data && err.response.data.error) || 'Update failed', 'error')
       }
     },
-
-    // ==================== NEW: DELETE USER ====================
     async deleteUser(item) {
-      if (!confirm(`Are you sure you want to permanently delete "${item.name || 'this user'}"?\n\nThis will also remove their payments and subscriptions.`)) {
+      if (!confirm('Are you sure you want to permanently delete "' + (item.name || 'this user') + '"?\n\nThis will also remove their payments and subscriptions.')) {
         return
       }
-
       try {
-        await api.delete(`/admin/users/${item.id}`)
+        const res = await api.delete('/admin/users/' + item.id)
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          return
+        }
         this.showSnackbar('User deleted successfully')
         this.fetchUsers()
         this.fetchStats()
       } catch (err) {
-        this.showSnackbar(
-          err.response?.data?.error || 'Failed to delete user',
-          'error'
-        )
+        this.showSnackbar((err.response && err.response.data && err.response.data.error) || 'Failed to delete user', 'error')
       }
     },
-
-    // ==================== NEW: START 30-DAY TRIAL ====================
     async startTrial(item) {
-      if (!confirm(`Put "${item.name || 'this user'}" on a 30-day free trial?`)) {
+      if (!confirm('Put "' + (item.name || 'this user') + '" on a 30-day free trial?')) {
         return
       }
-
       try {
-        const { data } = await api.post(`/admin/users/${item.id}/trial`, { days: 30 })
-        this.showSnackbar(data.message || 'Trial started successfully')
+        const res = await api.post('/admin/users/' + item.id + '/trial', { days: 30 })
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          return
+        }
+        this.showSnackbar(res.data.message || 'Trial started successfully')
         this.fetchUsers()
         this.fetchStats()
         this.fetchSubscriptions()
       } catch (err) {
-        this.showSnackbar(
-          err.response?.data?.error || 'Failed to start trial',
-          'error'
-        )
+        this.showSnackbar((err.response && err.response.data && err.response.data.error) || 'Failed to start trial', 'error')
       }
     },
-
     getStatusColor(status) {
       var colors = { active: 'success', pending: 'warning', expired: 'error', cancelled: 'grey', free: 'info', success: 'success', failed: 'error' }
       return colors[status] || 'grey'
     },
+
+    /* ─── SUBSCRIPTIONS ─── */
     renewSub(item) {
       this.selectedSub = item
       this.renewMonths = 1
@@ -1500,7 +1760,12 @@ export default {
     },
     async confirmRenew() {
       try {
-        await api.post('/admin/subscriptions/' + this.selectedSub.id + '/renew', { months: this.renewMonths })
+        const res = await api.post('/admin/subscriptions/' + this.selectedSub.id + '/renew', { months: this.renewMonths })
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          this.renewDialog = false
+          return
+        }
         this.showSnackbar('Renewed for ' + this.renewMonths + ' month(s)')
         this.renewDialog = false
         this.fetchSubscriptions()
@@ -1515,7 +1780,12 @@ export default {
     },
     async confirmExtend() {
       try {
-        await api.post('/admin/subscriptions/' + this.selectedSub.id + '/extend', { days: this.extendDays })
+        const res = await api.post('/admin/subscriptions/' + this.selectedSub.id + '/extend', { days: this.extendDays })
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          this.extendDialog = false
+          return
+        }
         this.showSnackbar('Extended by ' + this.extendDays + ' days')
         this.extendDialog = false
         this.fetchSubscriptions()
@@ -1526,7 +1796,11 @@ export default {
     async cancelSub(item) {
       if (!confirm('Cancel subscription for ' + item.user_name + '?')) return
       try {
-        await api.post('/admin/subscriptions/' + item.id + '/cancel')
+        const res = await api.post('/admin/subscriptions/' + item.id + '/cancel')
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          return
+        }
         this.showSnackbar('Subscription cancelled')
         this.fetchSubscriptions()
       } catch (err) {
@@ -1534,10 +1808,15 @@ export default {
       }
     },
 
+    /* ─── PAYMENTS ─── */
     async confirmPayment(id) {
       if (!confirm('Confirm this payment manually?')) return
       try {
-        await api.post('/admin/payments/confirm', { payment_id: id })
+        const res = await api.post('/admin/payments/confirm', { payment_id: id })
+        if (this.isQueued(res)) {
+          this.showQueuedSnackbar(res.data.request_code)
+          return
+        }
         this.showSnackbar('Payment confirmed')
         this.fetchPayments()
         this.fetchStats()
@@ -1546,6 +1825,7 @@ export default {
       }
     },
 
+    /* ─── MISC ─── */
     exportCSV() {
       var lines = []
       lines.push('Period,Transactions,Confirmed,Pending,Total')
@@ -1561,7 +1841,6 @@ export default {
       a.click()
       window.URL.revokeObjectURL(url)
     },
-
     showSnackbar(text, color) {
       color = color || 'success'
       this.snackbar = { show: true, text: text, color: color }
