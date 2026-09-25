@@ -726,33 +726,45 @@
                   <span v-else class="text--disabled">&mdash;</span>
                 </template>
                 <template v-slot:item.actions="{ item }">
-                  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'view')" title="View User">
-                    <v-icon small color="red darken-2">mdi-eye</v-icon>
-                  </v-btn>
-                  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'edit')" title="Edit User">
-                    <v-icon small color="red darken-2">mdi-pencil</v-icon>
-                  </v-btn>
-                  <v-btn
-                    icon
-                    small
-                    class="action-btn-hover mr-1"
-                    color="success"
-                    @click="startTrial(item)"
-                    title="Start 30-day Trial"
-                  >
-                    <v-icon small>mdi-calendar-clock</v-icon>
-                  </v-btn>
-                  <v-btn
-                    icon
-                    small
-                    class="action-btn-hover"
-                    color="error"
-                    @click="deleteUser(item)"
-                    title="Delete User"
-                  >
-                    <v-icon small>mdi-delete</v-icon>
-                  </v-btn>
-                </template>
+  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'view')" title="View User">
+    <v-icon small color="red darken-2">mdi-eye</v-icon>
+  </v-btn>
+  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'edit')" title="Edit User">
+    <v-icon small color="red darken-2">mdi-pencil</v-icon>
+  </v-btn>
+  <!-- ↓ ADD THIS BLOCK ↓ -->
+  <v-btn
+    icon
+    small
+    class="action-btn-hover mr-1"
+    color="info"
+    @click="sendPasswordReset(item)"
+    title="Send password reset email"
+  >
+    <v-icon small>mdi-lock-reset</v-icon>
+  </v-btn>
+  <!-- ↑ ADD THIS BLOCK ↑ -->
+  <v-btn
+    icon
+    small
+    class="action-btn-hover mr-1"
+    color="success"
+    @click="startTrial(item)"
+    title="Start 30-day Trial"
+  >
+    <v-icon small>mdi-calendar-clock</v-icon>
+  </v-btn>
+  <v-btn
+    icon
+    small
+    class="action-btn-hover"
+    color="error"
+    @click="deleteUser(item)"
+    title="Delete User"
+  >
+    <v-icon small>mdi-delete</v-icon>
+  </v-btn>
+</template>
               </v-data-table>
             </v-card>
           </v-col>
@@ -1729,6 +1741,24 @@ export default {
         this.showSnackbar((err.response && err.response.data && err.response.data.error) || 'Failed to delete user', 'error')
       }
     },
+    async sendPasswordReset(item) {
+  if (!item.email) {
+    this.showSnackbar('This user has no email on file', 'error');
+    return;
+  }
+
+  if (!confirm(`Send a password reset email to "${item.name || item.email}"?\n\nEmail: ${item.email}`)) {
+    return;
+  }
+
+  try {
+    const res = await api.post(`/admin/users/${item.id}/send-password-reset`);
+    this.showSnackbar(res.data.message || 'Reset email sent', 'success');
+  } catch (err) {
+    const msg = err.response?.data?.error || 'Could not send reset email';
+    this.showSnackbar(msg, 'error');
+  }
+},
     async startTrial(item) {
       if (!confirm('Put "' + (item.name || 'this user') + '" on a 30-day free trial?')) {
         return

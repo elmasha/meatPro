@@ -11,7 +11,7 @@
     <v-container class="fill-height d-flex align-center justify-center relative z-10">
       <v-row justify="center">
         <v-col cols="12" sm="8" md="5" lg="4">
-          
+
           <!-- Logo -->
           <div class="text-center mb-8 logo-reveal">
             <div class="logo-glow mb-4 d-inline-block">
@@ -66,14 +66,24 @@
                     dark
                     color="red"
                     background-color="rgba(255,255,255,0.03)"
-                    class="modern-input rounded-xl mb-6"
+                    class="modern-input rounded-xl mb-3"
                     prepend-inner-icon="mdi-lock-outline"
                     :append-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
                     :rules="[v => !!v || 'Required', v => v.length >= 6 || 'Min 6 chars']"
                     @click:append="showPassword = !showPassword"
                     @keyup.enter="handleLogin"
                   />
-                  
+
+                  <!-- Forgot Password link -->
+                  <div class="text-right mb-5">
+                    <a
+                      class="forgot-link"
+                      @click.prevent="goToForgotPassword"
+                    >
+                      Forgot password?
+                    </a>
+                  </div>
+
                   <v-btn
                     block
                     x-large
@@ -151,7 +161,7 @@
                     prepend-inner-icon="mdi-lock-check-outline"
                     :rules="[v => !!v || 'Required', v => v === register.password || 'Passwords do not match']"
                   />
-                  
+
                   <v-btn
                     block
                     x-large
@@ -196,7 +206,7 @@ import api from '../services/api'
 export default {
   layout: 'public',
   name: 'Login',
-  
+
   data() {
     return {
       authMode: 0,
@@ -222,7 +232,14 @@ export default {
         const { user } = await this.$fire.auth.signInWithEmailAndPassword(this.login.email, this.login.password)
         await this.syncUser(user)
         this.showSnackbar('Welcome back!')
-        this.checkBusinessAndRedirect(user.uid)
+
+        // Honor ?redirect= if present (e.g. from an SMS approval link)
+        const redirect = this.$route.query.redirect
+        if (redirect) {
+          this.$router.replace(decodeURIComponent(String(redirect)))
+        } else {
+          this.checkBusinessAndRedirect(user.uid)
+        }
       } catch (error) {
         this.showSnackbar(this.getError(error.code), 'error')
       } finally {
@@ -268,6 +285,14 @@ export default {
       }
     },
 
+    goToForgotPassword() {
+      // Preserve the pre-filled email and any redirect target
+      const query = {}
+      if (this.login.email) query.email = this.login.email
+      if (this.$route.query.redirect) query.redirect = this.$route.query.redirect
+      this.$router.push({ path: '/forgot-password', query })
+    },
+
     getError(code) {
       const errors = {
         'auth/invalid-email': 'Invalid email address',
@@ -282,7 +307,7 @@ export default {
 
   mounted() {
     this.$fire.auth.onAuthStateChanged(user => {
-      if (user) this.checkBusinessAndRedirect(user.uid)
+      if (user && !this.$route.query.redirect) this.checkBusinessAndRedirect(user.uid)
     })
   }
 }
@@ -358,7 +383,7 @@ export default {
   background: rgba(20, 20, 30, 0.6) !important;
   backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5),
               0 0 0 1px rgba(255, 255, 255, 0.02) inset;
 }
 
@@ -428,6 +453,21 @@ export default {
   background: linear-gradient(90deg, #d32f2f, #ff5252);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 0 10px rgba(211, 47, 47, 0.5);
+}
+
+/* Forgot password link */
+.forgot-link {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.forgot-link:hover {
+  color: #ef5350;
+  text-decoration: underline;
 }
 
 /* Modern Inputs */
