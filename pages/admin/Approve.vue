@@ -1,24 +1,37 @@
 <template>
   <div class="approve-page">
     <div class="approve-card" v-if="!done">
-      <div v-if="loading" class="state">
-        <v-progress-circular indeterminate color="cyan accent-2" size="52" />
-        <p>Loading request <strong>{{ code }}</strong>…</p>
+      <div v-if="loading || checkingRole" class="state">
+        <v-progress-circular indeterminate color="red darken-2" size="52" />
+        <p v-if="checkingRole">Checking permissions…</p>
+        <p v-else>Loading request <strong>{{ code }}</strong>…</p>
+      </div>
+
+      <div v-else-if="!isSuperAdmin" class="state error">
+        <v-icon size="56" color="red lighten-1">mdi-shield-off</v-icon>
+        <h2>Not authorized</h2>
+        <p>
+          You need <strong>super admin</strong> access to approve changes.
+          Ask a super admin to approve this request, or contact support.
+        </p>
+        <v-btn rounded color="red darken-2" dark class="mt-4" @click="$router.push('/admin')">
+          Back to Admin
+        </v-btn>
       </div>
 
       <div v-else-if="error" class="state error">
         <v-icon size="56" color="red lighten-1">mdi-alert-circle</v-icon>
         <h2>Cannot load request</h2>
         <p>{{ error }}</p>
-        <v-btn rounded color="cyan accent-2" dark style="color:#0E1018" class="mt-4" @click="$router.push('/admin/approvals')">
-          Go to Approvals
+        <v-btn rounded color="red darken-2" dark class="mt-4" @click="$router.push('/admin')">
+          Back to Admin
         </v-btn>
       </div>
 
       <template v-else-if="request">
         <div class="card-head">
           <div class="head-icon">
-            <v-icon color="black" size="24">mdi-shield-key</v-icon>
+            <v-icon color="white" size="24">mdi-shield-key</v-icon>
           </div>
           <div>
             <h1>Change Approval</h1>
@@ -77,9 +90,8 @@
           </v-btn>
           <v-btn
             rounded
-            color="cyan accent-2"
+            color="red darken-2"
             dark
-            style="color:#0E1018"
             large
             :loading="deciding"
             @click="decide('approve')"
@@ -96,11 +108,11 @@
       <h2>{{ resultTitle }}</h2>
       <p>{{ resultMessage }}</p>
       <div class="result-actions">
-        <v-btn text color="grey lighten-1" @click="$router.push('/admin/approvals')">
-          View all approvals
+        <v-btn text color="grey lighten-1" @click="$router.push('/admin')">
+          Back to Admin
         </v-btn>
-        <v-btn rounded color="cyan accent-2" dark style="color:#0E1018" @click="$router.push('/admin')">
-          Back to dashboard
+        <v-btn rounded color="red darken-2" dark @click="$router.push('/admin')">
+          Go to Dashboard
         </v-btn>
       </div>
     </div>
@@ -117,23 +129,26 @@ export default {
     return {
       code: null,
       loading: true,
+      checkingRole: true,
+      isSuperAdmin: false,
       error: null,
       request: null,
       deciding: false,
       done: false,
       resultTitle: '',
       resultMessage: '',
-      resultColor: 'green accent-3',
+      resultColor: 'success',
       resultIcon: 'mdi-check-circle',
     };
   },
 
-  mounted() {
+  async mounted() {
     this.code = (this.$route.query.code || '').toString().trim().toUpperCase();
 
     if (!this.code) {
       this.error = 'No approval code provided in the URL.';
       this.loading = false;
+      this.checkingRole = false;
       return;
     }
 
@@ -146,10 +161,41 @@ export default {
       return;
     }
 
+    // Verify the caller is a super_admin before doing anything else
+    await this.checkSuperAdmin();
+
+    if (!this.isSuperAdmin) {
+      this.loading = false;
+      return;
+    }
+
     this.fetchRequest();
   },
 
   methods: {
+    async checkSuperAdmin() {
+      this.checkingRole = true;
+      try {
+        const res = await api.get('/admin/me');
+        const admin = res.data?.admin || {};
+        this.isSuperAdmin = admin.role === 'super_admin';
+
+        if (!this.isSuperAdmin) {
+          // Not a super_admin — show the unauthorized state, don't fetch the request
+          this.error = null;
+        }
+      } catch (err) {
+        this.isSuperAdmin = false;
+        if (err.response?.status === 401 || err.response?.status === 403) {
+          this.error = 'You are not signed in as an admin.';
+        } else {
+          this.error = err.response?.data?.error || 'Could not verify admin role.';
+        }
+      } finally {
+        this.checkingRole = false;
+      }
+    },
+
     async fetchRequest() {
       this.loading = true;
       this.error = null;
@@ -174,12 +220,12 @@ export default {
         if (decision === 'approve') {
           this.resultTitle = 'Change approved';
           this.resultMessage = 'The change has been applied successfully.';
-          this.resultColor = 'green accent-3';
+          this.resultColor = 'success';
           this.resultIcon = 'mdi-check-circle';
         } else {
           this.resultTitle = 'Change rejected';
           this.resultMessage = 'The maker has been notified of your decision.';
-          this.resultColor = 'orange accent-3';
+          this.resultColor = 'warning';
           this.resultIcon = 'mdi-close-circle';
         }
         this.done = true;
@@ -208,25 +254,26 @@ export default {
   },
 };
 </script>
+
 <style scoped>
 .approve-page {
   min-height: 100vh;
-  background: #08090F;
+  background: #f8fafc;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding: 48px 16px;
-  color: #E2E8F0;
+  color: #1e293b;
 }
 
 .approve-card {
   width: 100%;
   max-width: 720px;
-  background: #0E1018;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 24px;
   padding: 32px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
 }
 
 .state {
@@ -237,12 +284,12 @@ export default {
   gap: 14px;
   min-height: 320px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.6);
+  color: #64748b;
 }
 
-.state h2 { color: #fff; margin: 8px 0 0; font-weight: 800; }
-.state p { margin: 0; font-size: 0.9rem; }
-.state.error h2 { color: #FF5252; }
+.state h2 { color: #1e293b; margin: 8px 0 0; font-weight: 800; }
+.state p { margin: 0; font-size: 0.9rem; max-width: 400px; }
+.state.error h2 { color: #c62828; }
 
 .card-head {
   display: flex;
@@ -254,30 +301,30 @@ export default {
 .head-icon {
   width: 52px;
   height: 52px;
-  background: #00FFFF;
+  background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%);
   border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(198, 40, 40, 0.3);
 }
 
 .card-head h1 {
   margin: 0;
   font-size: 1.4rem;
   font-weight: 800;
-  color: #fff;
+  color: #1e293b;
   letter-spacing: -0.5px;
 }
 
 .sub {
   margin: 4px 0 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: #64748b;
   font-size: 0.9rem;
 }
 
 .sub strong {
-  color: #00FFFF;
+  color: #c62828;
   font-family: 'SF Mono', 'Courier New', monospace;
   letter-spacing: 1px;
 }
@@ -292,7 +339,8 @@ export default {
 .meta-item {
   padding: 12px 14px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
 }
 
 .meta-item span {
@@ -300,28 +348,28 @@ export default {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.4);
+  color: #64748b;
   margin-bottom: 4px;
   font-weight: 700;
 }
 
 .meta-item strong {
-  color: #fff;
+  color: #1e293b;
   font-weight: 600;
   font-size: 0.9rem;
 }
 
-.status-pending { color: #FFC107 !important; }
+.status-pending { color: #e65100 !important; }
 .status-consumed,
-.status-approved { color: #69F0AE !important; }
-.status-rejected { color: #FF5252 !important; }
-.status-expired { color: rgba(255, 255, 255, 0.4) !important; }
+.status-approved { color: #2e7d32 !important; }
+.status-rejected { color: #c62828 !important; }
+.status-expired { color: #94a3b8 !important; }
 
 .subhead {
   margin: 22px 0 10px;
   font-size: 0.8rem;
   font-weight: 800;
-  color: rgba(255, 255, 255, 0.6);
+  color: #475569;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
@@ -339,13 +387,13 @@ export default {
 }
 
 .diff-col.before {
-  background: rgba(255, 82, 82, 0.05);
-  border: 1px solid rgba(255, 82, 82, 0.15);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
 }
 
 .diff-col.after {
-  background: rgba(0, 255, 255, 0.05);
-  border: 1px solid rgba(0, 255, 255, 0.2);
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
 }
 
 .diff-head {
@@ -356,14 +404,14 @@ export default {
   margin-bottom: 8px;
 }
 
-.diff-col.before .diff-head { color: #FF8A80; }
-.diff-col.after .diff-head { color: #00FFFF; }
+.diff-col.before .diff-head { color: #c62828; }
+.diff-col.after .diff-head { color: #2e7d32; }
 
 .diff-col pre {
   margin: 0;
   font-family: 'SF Mono', 'Courier New', monospace;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.85);
+  color: #1e293b;
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 320px;
@@ -375,9 +423,9 @@ export default {
   align-items: center;
   padding: 14px;
   border-radius: 14px;
-  background: rgba(255, 193, 7, 0.08);
-  border: 1px solid rgba(255, 193, 7, 0.2);
-  color: #FFD54F;
+  background: #fff8e1;
+  border: 1px solid #ffe082;
+  color: #e65100;
   font-size: 0.9rem;
   margin-bottom: 12px;
 }
@@ -387,7 +435,7 @@ export default {
   justify-content: flex-end;
   gap: 12px;
   padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid #e2e8f0;
 }
 
 .result {
@@ -400,12 +448,12 @@ export default {
 }
 
 .result h2 {
-  color: #fff;
+  color: #1e293b;
   font-weight: 800;
   margin: 12px 0 0;
 }
 
-.result p { color: rgba(255, 255, 255, 0.5); margin: 0; }
+.result p { color: #64748b; margin: 0; }
 
 .result-actions {
   display: flex;
