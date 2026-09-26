@@ -666,6 +666,48 @@
 
       <!-- ==================== USERS SECTION ==================== -->
       <v-container v-if="activeSection === 'users'" :fluid="nav_bars" class="px-4 px-sm-6 pt-2 pt-sm-4 pb-8">
+
+        <!-- ↓↓↓ NEW: SMS BALANCE CARD ↓↓↓ -->
+        <v-row dense class="mb-4">
+          <v-col cols="12">
+            <v-card class="rounded-2xl pa-4" elevation="0" outlined>
+              <div class="d-flex align-center flex-wrap" style="gap: 16px;">
+                <v-avatar :color="smsBalanceOk ? 'purple lighten-5' : 'red lighten-5'" size="48">
+                  <v-icon :color="smsBalanceOk ? 'purple darken-2' : 'red darken-2'">
+                    mdi-message-text-outline
+                  </v-icon>
+                </v-avatar>
+                <div class="flex-grow-1">
+                  <div class="text-caption text-uppercase font-weight-bold text--secondary tracking-wide">
+                    SMS Balance
+                  </div>
+                  <div class="text-h5 font-weight-bold text--primary">
+                    <span v-if="smsBalanceLoading">Loading…</span>
+                    <span v-else-if="smsBalanceError" class="red--text text--darken-2">
+                      {{ smsBalanceError }}
+                    </span>
+                    <span v-else>KES {{ Number(smsBalance).toLocaleString() }}</span>
+                  </div>
+                  <div class="text-caption text--secondary">
+                    <span v-if="smsBalanceUpdated">Updated {{ smsBalanceUpdated }}</span>
+                    <span v-else>Advanta Bulk SMS credit</span>
+                  </div>
+                </div>
+                <v-btn
+                  text
+                  color="red darken-2"
+                  class="text-capitalize font-weight-medium"
+                  :loading="smsBalanceLoading"
+                  @click="fetchSmsBalance"
+                >
+                  <v-icon left small>mdi-refresh</v-icon> Refresh
+                </v-btn>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+        <!-- ↑↑↑ END NEW ↑↑↑ -->
+
         <v-row>
           <v-col cols="12">
             <v-card class="rounded-2xl" elevation="0" outlined>
@@ -705,7 +747,7 @@
                     </v-avatar>
                     <div>
                       <div class="font-weight-semibold text--primary">{{ item.name || 'Unknown' }}</div>
-                      <div class="text-caption text--secondary">{{ item.phone }}</div>
+                      <div class="text-caption text--secondary">{{ item.email || item.phone }}</div>
                     </div>
                   </div>
                 </template>
@@ -726,45 +768,55 @@
                   <span v-else class="text--disabled">&mdash;</span>
                 </template>
                 <template v-slot:item.actions="{ item }">
-  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'view')" title="View User">
-    <v-icon small color="red darken-2">mdi-eye</v-icon>
-  </v-btn>
-  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'edit')" title="Edit User">
-    <v-icon small color="red darken-2">mdi-pencil</v-icon>
-  </v-btn>
-  <!-- ↓ ADD THIS BLOCK ↓ -->
-  <v-btn
-    icon
-    small
-    class="action-btn-hover mr-1"
-    color="info"
-    @click="sendPasswordReset(item)"
-    title="Send password reset email"
-  >
-    <v-icon small>mdi-lock-reset</v-icon>
-  </v-btn>
-  <!-- ↑ ADD THIS BLOCK ↑ -->
-  <v-btn
-    icon
-    small
-    class="action-btn-hover mr-1"
-    color="success"
-    @click="startTrial(item)"
-    title="Start 30-day Trial"
-  >
-    <v-icon small>mdi-calendar-clock</v-icon>
-  </v-btn>
-  <v-btn
-    icon
-    small
-    class="action-btn-hover"
-    color="error"
-    @click="deleteUser(item)"
-    title="Delete User"
-  >
-    <v-icon small>mdi-delete</v-icon>
-  </v-btn>
-</template>
+                  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'view')" title="View User">
+                    <v-icon small color="red darken-2">mdi-eye</v-icon>
+                  </v-btn>
+                  <v-btn icon small class="action-btn-hover mr-1" @click="openUserDialog(item, 'edit')" title="Edit User">
+                    <v-icon small color="red darken-2">mdi-pencil</v-icon>
+                  </v-btn>
+                  <!-- ↓↓↓ NEW: SEND SMS BUTTON ↓↓↓ -->
+                  <v-btn
+                    icon
+                    small
+                    class="action-btn-hover mr-1"
+                    color="purple"
+                    @click="openSendSmsDialog(item)"
+                    title="Send SMS"
+                  >
+                    <v-icon small>mdi-message-text-outline</v-icon>
+                  </v-btn>
+                  <!-- ↑↑↑ END NEW ↑↑↑ -->
+                  <v-btn
+                    icon
+                    small
+                    class="action-btn-hover mr-1"
+                    color="info"
+                    @click="sendPasswordReset(item)"
+                    title="Send password reset email"
+                  >
+                    <v-icon small>mdi-lock-reset</v-icon>
+                  </v-btn>
+                  <v-btn
+                    icon
+                    small
+                    class="action-btn-hover mr-1"
+                    color="success"
+                    @click="startTrial(item)"
+                    title="Start 30-day Trial"
+                  >
+                    <v-icon small>mdi-calendar-clock</v-icon>
+                  </v-btn>
+                  <v-btn
+                    icon
+                    small
+                    class="action-btn-hover"
+                    color="error"
+                    @click="deleteUser(item)"
+                    title="Delete User"
+                  >
+                    <v-icon small>mdi-delete</v-icon>
+                  </v-btn>
+                </template>
               </v-data-table>
             </v-card>
           </v-col>
@@ -1178,6 +1230,76 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- ↓↓↓ NEW: SEND SMS DIALOG ↓↓↓ -->
+    <v-dialog v-model="sendSmsDialog" max-width="520" rounded="xl">
+      <v-card class="rounded-2xl overflow-hidden">
+        <v-toolbar color="red darken-2" dark flat height="72" class="dialog-toolbar-premium">
+          <v-btn icon dark @click="sendSmsDialog = false"><v-icon>mdi-close</v-icon></v-btn>
+          <v-toolbar-title class="text-h6 font-weight-bold">Send SMS</v-toolbar-title>
+          <v-spacer></v-spacer>
+          <v-btn
+            text
+            dark
+            class="text-capitalize font-weight-bold rounded-lg"
+            :loading="sendSmsLoading"
+            :disabled="!sendSmsForm.message || sendSmsForm.message.length > 480"
+            @click="submitSendSms"
+          >
+            Send
+          </v-btn>
+        </v-toolbar>
+
+        <v-card-text class="pa-4 pa-sm-6 bg-surface">
+          <div class="mb-4 pa-3 rounded-xl" :class="$vuetify.theme.dark ? 'grey darken-4' : 'grey lighten-4'">
+            <div class="d-flex align-center">
+              <v-avatar size="36" color="red lighten-5" class="mr-3">
+                <span class="red--text font-weight-bold text-caption">
+                  {{ getInitials(sendSmsForm.userName || '?') }}
+                </span>
+              </v-avatar>
+              <div>
+                <div class="font-weight-bold text--primary">
+                  {{ sendSmsForm.userName || 'User' }}
+                </div>
+                <div class="text-caption text--secondary">
+                  {{ sendSmsForm.to || 'No phone on file' }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <label class="form-label">Send to</label>
+          <v-text-field
+            v-model="sendSmsForm.to"
+            placeholder="2547XXXXXXXX"
+            outlined
+            rounded
+            dense
+            hide-details="auto"
+            prepend-inner-icon="mdi-phone-outline"
+            class="rounded-lg mb-4"
+            hint="Leave as-is or override with another number"
+            persistent-hint
+          />
+
+          <label class="form-label">Message</label>
+          <v-textarea
+            v-model="sendSmsForm.message"
+            placeholder="Type your message…"
+            outlined
+            rounded
+            rows="4"
+            hide-details="auto"
+            class="rounded-lg"
+            :rules="[v => (v || '').length <= 480 || 'Max 480 characters']"
+            counter="480"
+            maxlength="480"
+          />
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+    <!-- ↑↑↑ END NEW ↑↑↑ -->
   </div>
 </template>
 <script>
@@ -1239,7 +1361,19 @@ export default {
       snackbar: { show: false, text: '', color: 'red darken-1' },
       authUnsubscribe: null,
       _approvalPoll: null,
-      chartData: [12000, 15000, 13500, 18000, 22000, 24000]
+      chartData: [12000, 15000, 13500, 18000, 22000, 24000],
+
+      // ── SMS balance state ──
+      smsBalance: 0,
+      smsBalanceLoading: false,
+      smsBalanceError: null,
+      smsBalanceOk: false,
+      smsBalanceUpdated: null,
+
+      // ── Send SMS dialog state ──
+      sendSmsDialog: false,
+      sendSmsLoading: false,
+      sendSmsForm: { userId: null, userName: '', to: '', message: '' }
     }
   },
   computed: {
@@ -1323,7 +1457,8 @@ export default {
       const q = this.userSearch.toLowerCase()
       return this.users.filter(u =>
         (u.name || '').toLowerCase().includes(q) ||
-        (u.phone || '').includes(q)
+        (u.phone || '').includes(q) ||
+        (u.email || '').toLowerCase().includes(q)
       )
     },
     subHeaders() {
@@ -1409,6 +1544,7 @@ export default {
     activeSection(newVal) {
       this.loadSectionData(newVal)
       if (newVal === 'approvals') this.fetchPendingRequests()
+      if (newVal === 'users') this.fetchSmsBalance()
     }
   },
   mounted() {
@@ -1462,7 +1598,7 @@ export default {
       switch (section) {
         case 'dashboard': await Promise.all([this.fetchStats(), this.fetchUsers(), this.fetchPayments()]); break
         case 'plans': await this.fetchPlans(); break
-        case 'users': await this.fetchUsers(); break
+        case 'users': await this.fetchUsers(); await this.fetchSmsBalance(); break
         case 'subscriptions': await this.fetchSubscriptions(); break
         case 'payments': await this.fetchPayments(); break
         case 'finance': await this.fetchRevenue(); break
@@ -1742,23 +1878,21 @@ export default {
       }
     },
     async sendPasswordReset(item) {
-  if (!item.email) {
-    this.showSnackbar('This user has no email on file', 'error');
-    return;
-  }
-
-  if (!confirm(`Send a password reset email to "${item.name || item.email}"?\n\nEmail: ${item.email}`)) {
-    return;
-  }
-
-  try {
-    const res = await api.post(`/admin/users/${item.id}/send-password-reset`);
-    this.showSnackbar(res.data.message || 'Reset email sent', 'success');
-  } catch (err) {
-    const msg = err.response?.data?.error || 'Could not send reset email';
-    this.showSnackbar(msg, 'error');
-  }
-},
+      if (!item.email) {
+        this.showSnackbar('This user has no email on file', 'error')
+        return
+      }
+      if (!confirm(`Send a password reset email to "${item.name || item.email}"?\n\nEmail: ${item.email}`)) {
+        return
+      }
+      try {
+        const res = await api.post(`/admin/users/${item.id}/send-password-reset`)
+        this.showSnackbar(res.data.message || 'Reset email sent', 'success')
+      } catch (err) {
+        const msg = (err.response && err.response.data && err.response.data.error) || 'Could not send reset email'
+        this.showSnackbar(msg, 'error')
+      }
+    },
     async startTrial(item) {
       if (!confirm('Put "' + (item.name || 'this user') + '" on a 30-day free trial?')) {
         return
@@ -1780,6 +1914,66 @@ export default {
     getStatusColor(status) {
       var colors = { active: 'success', pending: 'warning', expired: 'error', cancelled: 'grey', free: 'info', success: 'success', failed: 'error' }
       return colors[status] || 'grey'
+    },
+
+    /* ─── SMS BALANCE ─── */
+    async fetchSmsBalance() {
+      this.smsBalanceLoading = true
+      this.smsBalanceError = null
+      try {
+        const { data } = await api.get('/admin/sms/balance')
+        this.smsBalance = Number(data.balance) || 0
+        this.smsBalanceOk = true
+        this.smsBalanceUpdated = new Date().toLocaleTimeString()
+      } catch (err) {
+        this.smsBalanceOk = false
+        this.smsBalanceError =
+          (err.response && err.response.data && err.response.data.error) ||
+          'Failed to load balance'
+        this.smsBalance = 0
+      } finally {
+        this.smsBalanceLoading = false
+      }
+    },
+
+    /* ─── SEND SMS ─── */
+    openSendSmsDialog(user) {
+      this.sendSmsForm = {
+        userId: user.id,
+        userName: user.name || '',
+        to: user.phone || '',
+        message: ''
+      }
+      this.sendSmsDialog = true
+    },
+    async submitSendSms() {
+      if (!this.sendSmsForm.message || !this.sendSmsForm.message.trim()) {
+        this.showSnackbar('Enter a message first', 'error')
+        return
+      }
+      if (this.sendSmsForm.message.length > 480) {
+        this.showSnackbar('Message too long (max 480 characters)', 'error')
+        return
+      }
+      this.sendSmsLoading = true
+      try {
+        const { data } = await api.post(
+          `/admin/users/${this.sendSmsForm.userId}/send-sms`,
+          {
+            to: this.sendSmsForm.to || undefined,
+            message: this.sendSmsForm.message.trim()
+          }
+        )
+        this.showSnackbar(data.message || 'SMS sent', 'success')
+        this.sendSmsDialog = false
+      } catch (err) {
+        this.showSnackbar(
+          (err.response && err.response.data && err.response.data.error) || 'Failed to send SMS',
+          'error'
+        )
+      } finally {
+        this.sendSmsLoading = false
+      }
     },
 
     /* ─── SUBSCRIPTIONS ─── */
@@ -2013,9 +2207,12 @@ export default {
 .hover-row { transition: background-color 0.2s ease; }
 .hover-row:hover { background-color: #f8fafc !important; }
 
-/* Action button hover */
+/* Action button hover (default red) */
 .action-btn-hover { transition: all 0.2s ease; }
 .action-btn-hover:hover { background: rgba(198, 40, 40, 0.1); }
+
+/* ─── NEW: Purple SMS button hover ─── */
+.action-btn-hover[color="purple"]:hover { background: rgba(156, 39, 176, 0.1); }
 
 /* Search field */
 .search-field-premium ::v-deep .v-input__slot {
@@ -2034,6 +2231,17 @@ export default {
 /* Dialog */
 .dialog-toolbar-premium {
   background: linear-gradient(135deg, #c62828 0%, #b71c1c 100%) !important;
+}
+
+/* ─── NEW: Form labels used in the Send SMS dialog ─── */
+.form-label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 /* Finance cards */
@@ -2128,4 +2336,5 @@ export default {
 .theme--dark .entries-table-premium ::v-deep th { background: #1e293b !important; color: #94a3b8 !important; border-color: #334155 !important; }
 .theme--dark .hover-row:hover { background-color: #1e293b !important; }
 .theme--dark .bottom-nav-premium { background: rgba(15, 23, 42, 0.95) !important; border-color: #334155 !important; }
+.theme--dark .form-label { color: #cbd5e1; }
 </style>
