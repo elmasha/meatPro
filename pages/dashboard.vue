@@ -2438,9 +2438,17 @@ export default {
           paymentMpesa: parseFloat(last.paymentMpesa) || 0,
         }
 
+        // --- LAST 7 DAYS COST FIX ---
+        let weekCost = parseFloat(week.totalCost) || parseFloat(week.totalExpenses) || 0;
+        // If totalCost is not provided, sum the daily expenses array (ignoring cogs)
+        if (weekCost === 0 && week.data) {
+            weekCost = week.data.reduce((sum, day) => {
+                return sum + (parseFloat(day.expenses) || parseFloat(day.totalExpenses) || 0);
+            }, 0);
+        }
+
         const weekRevenue = parseFloat(week.totalActualRevenue) || parseFloat(week.totalRevenue) || 0
         const weekCogs = parseFloat(week.totalCogs) || 0
-        const weekCost = parseFloat(week.totalCost) || parseFloat(week.totalExpenses) || 0
 
         this.stats.week = {
           revenue: parseFloat(week.totalRevenue) || 0,
@@ -2451,9 +2459,17 @@ export default {
           margin: weekRevenue - weekCost,
         }
 
+        // --- THIS MONTH COST FIX ---
+        let monthCost = parseFloat(month.totalCost) || parseFloat(month.totalExpenses) || 0;
+        // If totalCost is not provided, sum the daily expenses array (ignoring cogs)
+        if (monthCost === 0 && month.data) {
+            monthCost = month.data.reduce((sum, day) => {
+                return sum + (parseFloat(day.expenses) || parseFloat(day.totalExpenses) || 0);
+            }, 0);
+        }
+
         const monthRevenue = parseFloat(month.totalActualRevenue) || parseFloat(month.totalRevenue) || 0
         const monthCogs = parseFloat(month.totalCogs) || 0
-        const monthCost = parseFloat(month.totalCost) || parseFloat(month.totalExpenses) || 0
 
         this.stats.month = {
           revenue: parseFloat(month.totalRevenue) || 0,
@@ -2567,14 +2583,24 @@ export default {
           lastCost += parseFloat(last?.totalCost || last?.totalExpenses) || 0
           lastCogs += parseFloat(last?.cogs || last?.totalCogs) || 0
 
+          // Sum 7 days cost
+          let wCost = parseFloat(week?.totalCost) || parseFloat(week?.totalExpenses) || 0;
+          if (wCost === 0 && week?.data) {
+              wCost = week.data.reduce((sum, day) => sum + (parseFloat(day.expenses) || parseFloat(day.totalExpenses) || 0), 0);
+          }
           weekActual += parseFloat(week?.totalActualRevenue || week?.totalRevenue) || 0
           weekExpected += parseFloat(week?.totalRevenue) || 0
-          weekCost += parseFloat(week?.totalCost || week?.totalExpenses) || 0
+          weekCost += wCost
           weekCogs += parseFloat(week?.totalCogs) || 0
 
+          // Sum Month cost
+          let mCost = parseFloat(month?.totalCost) || parseFloat(month?.totalExpenses) || 0;
+          if (mCost === 0 && month?.data) {
+              mCost = month.data.reduce((sum, day) => sum + (parseFloat(day.expenses) || parseFloat(day.totalExpenses) || 0), 0);
+          }
           monthActual += parseFloat(month?.totalActualRevenue || month?.totalRevenue) || 0
           monthExpected += parseFloat(month?.totalRevenue) || 0
-          monthCost += parseFloat(month?.totalCost || month?.totalExpenses) || 0
+          monthCost += mCost
           monthCogs += parseFloat(month?.totalCogs) || 0
         })
 
