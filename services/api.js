@@ -2,7 +2,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://meatproserver-production-67bf.up.railway.app/api',
+  baseURL: 'https://meatproserver-production-ef75.up.railway.app/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
